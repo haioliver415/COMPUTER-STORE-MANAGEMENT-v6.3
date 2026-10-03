@@ -1,0 +1,15 @@
+node_modules/
+config/database.json
+backups/
+.env
+.env.*
+!.env.example
+npm-debug.log*
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+coverage/
+dist/
+release/

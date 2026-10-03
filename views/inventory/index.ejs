@@ -1,0 +1,206 @@
+<% var canAdjust=hasPermission('inventory_adjust'); var canCount=hasPermission('stock_count'); var canPurchase=hasPermission('purchase_manage'); var canSeeCost=['admin','manager'].includes(user.role); %>
+<% if (success) { %><div class="alert alert-success"><i class="bi bi-check-circle"></i> <%= success %></div><% } %>
+<% if (errorMessage) { %><div class="alert alert-danger"><i class="bi bi-exclamation-triangle"></i> <%= errorMessage %></div><% } %>
+
+<div class="d-flex justify-content-between align-items-center mt-3 mb-3 flex-wrap gap-2">
+  <div><h2 class="mb-1"><i class="bi bi-boxes"></i> Inventory &amp; Stock</h2><div class="text-muted">Product Code identifies the model. Serial Number is optional per model. Every physical unit always has an automatic Unit Code.</div></div>
+  <div class="d-flex gap-2">
+    <% if (canPurchase) { %><a href="/suppliers/purchases" class="btn btn-outline-primary"><i class="bi bi-bag-check"></i> Purchases</a><% } %>
+    <% if(hasPermission('report_export')){ %><div class="dropdown">
+      <button class="btn btn-outline-success dropdown-toggle" type="button" data-bs-toggle="dropdown"><i class="bi bi-download"></i> Export</button>
+      <ul class="dropdown-menu dropdown-menu-end">
+        <li><button class="dropdown-item" type="button" onclick="runInventoryExport('print')"><i class="bi bi-printer me-2"></i>Print Count Sheet</button></li>
+        <li><button class="dropdown-item" type="button" onclick="runInventoryExport('xlsx')"><i class="bi bi-file-earmark-excel me-2"></i>Excel (.xlsx)</button></li>
+        <li><button class="dropdown-item" type="button" onclick="runInventoryExport('csv')"><i class="bi bi-filetype-csv me-2"></i>CSV</button></li>
+      </ul>
+    </div><% } %>
+    <a href="/reports" class="btn btn-outline-secondary"><i class="bi bi-clipboard-data"></i> Stock Report</a>
+  </div>
+</div>
+
+<div class="row g-2 mb-3 inventory-summary-row">
+  <div class="col-6 col-xl-2"><div class="stat-card primary h-100 inventory-stat-card" data-filter="products" onclick="applyInventoryCardFilter('products',this)"><div class="stat-icon"><i class="bi bi-box-seam"></i></div><div class="stat-label">Products</div><div class="stat-value"><%= summary.product_count||0 %></div></div></div>
+  <div class="col-6 col-xl-2"><div class="stat-card success h-100 inventory-stat-card" data-filter="available" onclick="applyInventoryCardFilter('available',this)"><div class="stat-icon"><i class="bi bi-boxes"></i></div><div class="stat-label">Available Units</div><div class="stat-value"><%= summary.total_stock||0 %></div></div></div>
+  <div class="col-6 col-xl-2"><div class="stat-card warning h-100 inventory-stat-card" data-filter="low" onclick="applyInventoryCardFilter('low',this)"><div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div><div class="stat-label">Low Stock</div><div class="stat-value"><%= summary.low_stock||0 %></div></div></div>
+  <div class="col-6 col-xl-2"><div class="stat-card danger h-100 inventory-stat-card" data-filter="out" onclick="applyInventoryCardFilter('out',this)"><div class="stat-icon"><i class="bi bi-x-octagon"></i></div><div class="stat-label">Out of Stock</div><div class="stat-value"><%= summary.out_stock||0 %></div></div></div>
+  <div class="col-6 col-xl-2"><div class="stat-card danger h-100 inventory-stat-card" data-filter="damaged" onclick="applyInventoryCardFilter('damaged',this)"><div class="stat-icon"><i class="bi bi-tools"></i></div><div class="stat-label">Damaged / Lost</div><div class="stat-value"><%= Number(summary.damaged||0)+Number(summary.lost||0) %></div></div></div>
+  <% if(canSeeCost){ %><div class="col-6 col-xl-2"><div class="stat-card info h-100 inventory-stat-card" data-filter="value" onclick="applyInventoryCardFilter('value',this)"><div class="stat-icon"><i class="bi bi-cash-stack"></i></div><div class="stat-label">Stock Value</div><div class="stat-value fs-5"><%= money(summary.stock_value||0) %></div></div></div><% } else { %><div class="col-6 col-xl-2"><div class="stat-card info h-100 inventory-stat-card" data-filter="todayin" onclick="applyInventoryCardFilter('todayin',this)"><div class="stat-icon"><i class="bi bi-arrow-down-circle"></i></div><div class="stat-label">Today Stock In</div><div class="stat-value"><%= summary.today_in||0 %></div></div></div><% } %>
+</div>
+
+<div class="card mb-3"><div class="card-body py-3">
+  <div class="d-flex align-items-end gap-2 flex-wrap">
+    <div class="inventory-search-bar flex-grow-1"><label class="form-label mb-1 fw-semibold"><i class="bi bi-search"></i> Search Inventory</label>
+      <select id="inventoryQuickProduct" class="form-select product-search-select" data-placeholder="Product name / Product Code / Barcode / Unit Code / Serial" onchange="inventoryQuickSelected()">
+        <option value="">Search product</option>
+        <% products.forEach(function(p){ %><option value="<%= p.id %>" data-code="<%= p.product_code||'' %>" data-barcode="<%= p.barcode||'' %>" data-stock="<%= p.stock_qty %>" data-tracking="<%= p.tracking_mode %>"><%= p.name %> · <%= p.product_code||'-' %> (Stock <%= p.stock_qty %>)</option><% }) %>
+      </select>
+    </div>
+    <button type="button" class="btn btn-outline-secondary" onclick="clearInventoryFilter()"><i class="bi bi-x-circle"></i> Clear</button>
+  </div>
+  <div id="inventoryFilterNote" class="small text-muted mt-2 inventory-filter-note">Search by product name, product code, barcode, Unit Code or Serial Number. Click any summary card to open its list directly.</div>
+</div></div>
+
+<div class="card mb-4 inventory-toolbar-card"><div class="card-body py-3"><div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+  <ul class="nav nav-pills inventory-tabs" id="inventoryTabs" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#stockOverview" type="button"><i class="bi bi-grid-1x2"></i> Overview</button></li>
+    <% if(canAdjust){ %><li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#stockReceive" type="button"><i class="bi bi-box-arrow-in-down"></i> Stock In</button></li><% } %>
+    <% if(canAdjust){ %><li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#stockAdjust" type="button"><i class="bi bi-sliders"></i> Adjustment</button></li><% } %><% if(canCount){ %><li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#stockCount" type="button"><i class="bi bi-clipboard-check"></i> Stock Count</button></li><% } %>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#stockUnits" type="button"><i class="bi bi-upc-scan"></i> Units</button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#stockHistory" type="button"><i class="bi bi-clock-history"></i> History</button></li>
+  </ul>
+  <div class="small text-muted"><span class="me-3"><i class="bi bi-arrow-down-circle text-success"></i> Today In <strong><%= summary.today_in||0 %></strong></span><span><i class="bi bi-arrow-up-circle text-danger"></i> Today Out <strong><%= summary.today_out||0 %></strong></span></div>
+</div></div></div>
+
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="stockOverview">
+    <div class="card mb-4"><div class="card-header"><div><h5 class="mb-0"><i class="bi bi-bar-chart"></i> Current Stock</h5><small class="text-muted">Stock quantity cannot be edited directly. It changes only through Stock In, POS Sale, Return or Adjustment.</small></div></div>
+      <div class="card-body p-0 table-responsive"><table id="inventoryOverviewTable" class="table table-hover mb-0 align-middle compact-table table-tight table-nowrap"><thead class="table-dark"><tr><th>Product / Code</th><th>Tracking</th><th class="text-center">Available</th><th class="text-center">Own</th><th class="text-center">Dealer</th><th class="text-center">Legacy</th><th class="text-center">Damaged</th><th class="text-center">Lost</th><th>Status</th></tr></thead><tbody id="inventoryOverviewBody">
+      <% products.forEach(function(p){ var mismatch=Number(p.stock_qty)!==Number(p.tracked_stock||0); var state=Number(p.stock_qty)<=0?'out':Number(p.stock_qty)<=Number(p.min_stock)?'low':'ok'; %>
+        <tr class="<%= mismatch ? 'table-warning' : '' %>" data-product-id="<%= p.id %>" data-stock="<%= p.stock_qty %>" data-min="<%= p.min_stock %>" data-damaged="<%= p.damaged_stock||0 %>" data-lost="<%= p.lost_stock||0 %>" data-state="<%= state %>">
+          <td><strong><%= p.name %></strong><div class="small text-muted"><code><%= p.product_code || '-' %></code> <%= [p.brand,p.model].filter(Boolean).join(' · ') %><% if(p.barcode){ %> · <span title="Barcode">BC <%= p.barcode %></span><% } %></div></td>
+          <td><span class="badge bg-light text-dark border"><%= p.tracking_mode==='required'?'Serial required':p.tracking_mode==='quantity'?'Quantity only':'Serial optional' %></span></td>
+          <td class="text-center fw-bold"><%= p.stock_qty %></td><td class="text-center"><%= p.own_stock||0 %></td><td class="text-center"><%= p.dealer_stock||0 %></td><td class="text-center"><%= p.legacy_stock||0 %></td><td class="text-center"><%= p.damaged_stock||0 %></td><td class="text-center"><%= p.lost_stock||0 %></td>
+          <td><span class="stock-pill stock-<%= state %>"><%= state==='out'?'OUT STOCK':state==='low'?'LOW':'OK' %></span><% if(mismatch){ %><div class="small text-danger mt-1">Qty mismatch: tracked <%= p.tracked_stock||0 %></div><% } %></td>
+        </tr>
+      <% }) %>
+      <% if(!products.length){ %><tr><td colspan="9" class="text-center text-muted py-4">No products.</td></tr><% } %>
+      </tbody></table></div>
+    </div>
+
+    <% if (canAdjust && products.some(function(p){return Number(p.legacy_stock||0)>0})) { %>
+    <div class="card mb-4"><div class="card-header"><h5 class="mb-0"><i class="bi bi-tags"></i> Classify Existing Legacy Stock</h5></div><div class="card-body">
+      <div class="alert alert-light border small">Old stock that had no Own/Dealer source is marked <strong>Legacy</strong>. Classifying it does not change total stock.</div>
+      <form method="POST" action="/inventory/reclassify" class="row g-2">
+        <div class="col-md-4"><select name="product_id" class="form-select product-search-select" data-restrict-options="1" data-placeholder="Search legacy product" required><option value="">Product with legacy stock</option><% products.filter(function(p){return Number(p.legacy_stock||0)>0}).forEach(function(p){ %><option value="<%= p.id %>"><%= p.name %> (Legacy <%= p.legacy_stock %>)</option><% }) %></select></div>
+        <div class="col-md-2"><input type="number" name="quantity" min="1" value="1" class="form-control" required></div>
+        <div class="col-md-2"><select name="source_type" id="classifySource" class="form-select" onchange="toggleClassifyDealer()"><option value="own">Own Stock</option><option value="dealer">Dealer Stock</option></select></div>
+        <div class="col-md-2 classify-dealer d-none"><select name="supplier_id" class="form-select supplier-search-select" data-placeholder="Search dealer / phone / email"><option value="">Dealer</option><% suppliers.forEach(function(s){ %><option value="<%= s.id %>" data-name="<%= s.name %>" data-phone="<%= s.phone||'' %>" data-email="<%= s.email||'' %>"><%= s.name %><%= s.phone ? ' · '+s.phone : '' %></option><% }) %></select></div>
+        <div class="col-md-1 classify-dealer d-none"><input type="number" name="dealer_warranty_months" min="0" value="12" class="form-control" title="Dealer warranty months"></div>
+        <div class="col-md-1"><button class="btn btn-outline-primary w-100">Save</button></div>
+      </form>
+    </div></div>
+    <% } %>
+  </div>
+
+  <div class="tab-pane fade" id="stockReceive">
+    <div class="card mb-4"><div class="card-header"><div><h5 class="mb-0"><i class="bi bi-box-arrow-in-down"></i> Receive / Stock In</h5><small class="text-muted">For supplier invoices, use Purchases. Use this form for opening stock, manual receiving or corrections that are true stock-in events.</small></div></div><div class="card-body">
+      <form method="POST" action="/inventory/receive" id="receiveStockForm">
+        <div class="row g-3">
+          <div class="col-lg-5"><label class="form-label">Product</label><select name="product_id" id="receiveProduct" class="form-select product-search-select" data-placeholder="Search product / code / barcode / unit / serial" required onchange="updateReceiveTracking()"><option value="">Select product</option><% products.forEach(function(p){ %><option value="<%= p.id %>" data-tracking="<%= p.tracking_mode %>" data-code="<%= p.product_code||'' %>"><%= p.name %> · <%= p.product_code||'-' %> (Stock <%= p.stock_qty %>)</option><% }) %></select><div class="form-text" id="receiveTrackingHint">Select a product to see its serial rule.</div></div>
+          <div class="col-lg-2"><label class="form-label">Quantity</label><input name="quantity" id="receiveQty" type="number" class="form-control" min="1" value="1" required></div>
+          <div class="col-lg-2"><label class="form-label">Source</label><select name="source_type" id="sourceType" class="form-select" onchange="toggleDealerFields()"><option value="own">Own Stock</option><option value="dealer">Dealer Stock</option></select></div>
+          <% if(canSeeCost){ %><div class="col-lg-3"><label class="form-label">Cost / Unit</label><input name="cost_price" type="number" class="form-control" step="0.01" min="0" value="0"></div><% } else { %><input type="hidden" name="cost_price" value="0"><% } %>
+          <div class="col-lg-4 dealer-field d-none"><label class="form-label">Dealer / Supplier</label><select name="supplier_id" class="form-select supplier-search-select" data-placeholder="Search dealer / phone / email"><option value="">Select dealer</option><% suppliers.forEach(function(s){ %><option value="<%= s.id %>" data-name="<%= s.name %>" data-phone="<%= s.phone||'' %>" data-email="<%= s.email||'' %>"><%= s.name %><%= s.phone ? ' · '+s.phone : '' %></option><% }) %></select></div>
+          <div class="col-lg-3 dealer-field d-none"><label class="form-label">Dealer Warranty (months)</label><input name="dealer_warranty_months" type="number" class="form-control" min="0" value="12"></div>
+          <div class="col-lg-5 receive-serial-field"><label class="form-label">Serial Number(s) <small class="text-muted">one per line or comma</small></label><textarea name="serial_numbers" id="receiveSerials" class="form-control" rows="3" placeholder="SN001&#10;SN002"></textarea></div>
+          <div class="col-lg-4"><label class="form-label">Reference</label><input name="reference" class="form-control" placeholder="PO, invoice or stock note"></div>
+          <div class="col-lg-8"><label class="form-label">Notes</label><input name="notes" class="form-control" placeholder="Reason / receiving details"></div>
+          <div class="col-lg-4 d-flex align-items-end"><button class="btn btn-primary w-100"><i class="bi bi-plus-circle"></i> Add to Stock</button></div>
+        </div>
+      </form>
+    </div></div>
+  </div>
+
+  <% if (canAdjust) { %>
+  <div class="tab-pane fade" id="stockAdjust">
+    <div class="card mb-4"><div class="card-header"><div><h5 class="mb-0"><i class="bi bi-sliders"></i> Stock Adjustment</h5><small class="text-muted">Use this for damaged, lost or counting corrections. Every adjustment is recorded in history.</small></div></div><div class="card-body">
+      <form method="POST" action="/inventory/adjust" id="adjustForm">
+        <div class="row g-3">
+          <div class="col-lg-5"><label class="form-label">Product</label><select name="product_id" id="adjustProduct" class="form-select product-search-select" data-placeholder="Search product / code / barcode / unit / serial" required onchange="updateAdjustTracking()"><option value="">Select product</option><% products.forEach(function(p){ %><option value="<%= p.id %>" data-tracking="<%= p.tracking_mode %>" data-stock="<%= p.stock_qty %>"><%= p.name %> · <%= p.product_code||'-' %> (Stock <%= p.stock_qty %>)</option><% }) %></select><div id="adjustTrackingHint" class="form-text"></div></div>
+          <div class="col-lg-3"><label class="form-label">Adjustment Type</label><select name="adjustment_type" id="adjustType" class="form-select" onchange="updateAdjustmentFields()" required><option value="">Select type</option><option value="add">Add / Count increase</option><option value="remove">Remove / Count decrease</option><option value="damaged">Damaged</option><option value="lost">Lost</option></select></div>
+          <div class="col-lg-2"><label class="form-label">Quantity</label><input name="quantity" id="adjustQty" type="number" min="1" value="1" class="form-control" required></div>
+          <div class="col-lg-2"><label class="form-label">Reference</label><input name="reference" class="form-control" placeholder="COUNT-001"></div>
+          <div class="col-lg-6 adjustment-add-serial d-none"><label class="form-label">New Serial Number(s)</label><textarea name="serial_numbers" id="adjustSerials" class="form-control" rows="3" placeholder="Only for Add. One per line/comma."></textarea></div>
+          <div class="col-lg-6 adjustment-out-unit d-none"><label class="form-label">Unit Code / Serial Number(s)</label><textarea name="unit_refs" id="adjustUnitRefs" class="form-control" rows="3" placeholder="For serial-required products, enter every unit being removed/damaged/lost."></textarea></div>
+          <div class="col-lg-8"><label class="form-label">Reason <span class="text-danger">*</span></label><input name="reason" class="form-control" required placeholder="Physical count difference, damaged screen, missing item..."></div>
+          <div class="col-lg-4 d-flex align-items-end"><button class="btn btn-warning w-100"><i class="bi bi-check2-square"></i> Save Adjustment</button></div>
+        </div>
+      </form>
+    </div></div>
+  </div>
+  <% } %>
+
+  <% if(canCount){ %>
+  <div class="tab-pane fade" id="stockCount">
+    <div class="row g-3">
+      <div class="col-xl-7"><div class="card"><div class="card-header"><div><h5 class="mb-0"><i class="bi bi-clipboard-check"></i> New Physical Stock Count</h5><small class="text-muted">Enter only products you physically counted. Blank rows are skipped. Save Draft first, review, then Confirm.</small></div></div><div class="card-body">
+        <div class="mb-2"><input id="countFilter" class="form-control" placeholder="Search product / code / barcode" oninput="filterCountRows()"></div>
+        <div class="table-responsive stock-count-table"><table class="table table-sm align-middle mb-0"><thead class="table-light"><tr><th>Product</th><th class="text-center">System</th><th style="width:130px">Actual</th><th class="text-center">Diff</th></tr></thead><tbody id="countRows"><% products.forEach(function(p){ %><tr data-search="<%= (p.name+' '+(p.product_code||'')+' '+(p.barcode||'')).toLowerCase() %>" data-system="<%= p.stock_qty %>" data-id="<%= p.id %>"><td><strong><%= p.name %></strong><div class="small text-muted"><code><%= p.product_code||'-' %></code> · <%= p.tracking_mode==='required'?'Serial required':p.tracking_mode==='quantity'?'Quantity only':'Serial optional' %></div></td><td class="text-center fw-semibold"><%= p.stock_qty %></td><td><input class="form-control form-control-sm count-actual" type="number" min="0" placeholder="—" oninput="updateCountDiff(this)"></td><td class="text-center count-diff text-muted">—</td></tr><% }) %></tbody></table></div>
+        <div class="mt-3"><label class="form-label">Count Note</label><input id="countNotes" class="form-control" placeholder="e.g. End of month physical count"></div>
+        <div class="d-flex justify-content-end mt-3"><button id="saveCountBtn" class="btn btn-primary" onclick="saveStockCount()"><i class="bi bi-save"></i> Save Count Draft</button></div>
+      </div></div></div>
+      <div class="col-xl-5"><div class="card"><div class="card-header"><h5 class="mb-0">Recent Counts</h5></div><div class="card-body p-0"><div class="list-group list-group-flush"><% (counts||[]).forEach(function(c){ %><div class="list-group-item d-flex justify-content-between align-items-center gap-2"><div><strong><%= c.count_code %></strong><div class="small text-muted"><%= new Date(c.created_at).toLocaleString() %> · <%= c.item_count %> item(s) · <%= c.difference_count %> diff</div><div class="small"><span class="badge bg-<%= c.status==='confirmed'?'success':c.status==='cancelled'?'secondary':'warning text-dark' %>"><%= c.status %></span> <%= c.created_by_name||'' %></div></div><div class="d-flex gap-1"><button class="btn btn-sm btn-outline-info" onclick="viewStockCount(<%= c.id %>)"><i class="bi bi-eye"></i></button><% if(c.status==='draft'){ %><button class="btn btn-sm btn-outline-success" onclick="confirmStockCount(<%= c.id %>)"><i class="bi bi-check-lg"></i></button><% } %></div></div><% }) %><% if(!(counts||[]).length){ %><div class="text-center text-muted py-4">No stock counts yet.</div><% } %></div></div></div></div>
+    </div>
+  </div>
+  <% } %>
+
+  <div class="tab-pane fade" id="stockUnits">
+    <div class="card mb-4"><div class="card-header d-flex justify-content-between align-items-center gap-3 flex-wrap"><div><h5 class="mb-0"><i class="bi bi-upc-scan"></i> Tracked Units</h5><small class="text-muted">Unit Code is generated by the system. Factory Serial is stored only when the product uses one.</small></div><input id="unitSearch" class="form-control" style="max-width:330px" placeholder="Search Unit Code / Serial / Product" oninput="filterUnits()"></div>
+      <div class="card-body p-0 table-responsive"><table class="table table-sm table-hover mb-0 align-middle compact-table table-tight table-nowrap"><thead class="table-light"><tr><th>Unit Code</th><th>Product</th><th>Serial Number</th><th>Source</th><th>Dealer</th><th>Warranty End</th><th>Status</th><th></th></tr></thead><tbody id="unitTableBody">
+      <% units.forEach(function(u){ %>
+        <tr data-product-id="<%= u.product_id %>" data-status="<%= u.status %>" data-search="<%= ([u.internal_code,u.serial_number,u.product_name,u.product_code,u.supplier_name,u.status].filter(Boolean).join(' ')).toLowerCase() %>"><td><code><%= u.internal_code %></code></td><td><strong><%= u.product_name %></strong><div class="small text-muted"><code><%= u.product_code||'-' %></code> · <%= u.tracking_mode==='required'?'Serial required':u.tracking_mode==='quantity'?'Quantity only':'Serial optional' %></div></td><td><%= u.serial_number||'-' %></td><td><span class="badge bg-<%= u.source_type==='dealer'?'info text-dark':u.source_type==='own'?'primary':'secondary' %>"><%= u.source_type %></span></td><td><%= u.supplier_name||'-' %></td><td><%= u.dealer_warranty_end?String(u.dealer_warranty_end).slice(0,10):'-' %></td><td><span class="badge bg-light text-dark border"><%= u.status %></span></td><td class="text-end"><% if(canAdjust){ %><button class="btn btn-sm btn-outline-primary" onclick='openEditUnit(<%- JSON.stringify({id:u.id,serial_number:u.serial_number||"",source_type:u.source_type||"legacy",supplier_id:u.supplier_id||"",dealer_warranty_end:u.dealer_warranty_end?String(u.dealer_warranty_end).slice(0,10):"",notes:u.notes||""}).replace(/</g,"\\u003c") %>)'><i class="bi bi-pencil"></i></button><% } %></td></tr>
+      <% }) %>
+      <% if(!units.length){ %><tr><td colspan="8" class="text-center text-muted py-4">No tracked units.</td></tr><% } %>
+      </tbody></table></div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="stockHistory">
+    <div class="card"><div class="card-header"><h5 class="mb-0"><i class="bi bi-clock-history"></i> Stock Movement History</h5></div><div class="card-body p-0 table-responsive"><table class="table table-sm table-hover mb-0 compact-table table-tight table-nowrap"><thead class="table-light"><tr><th>Date</th><th>Product</th><th>Unit / Serial</th><th>Movement</th><th class="text-center">Change</th><th>Reference</th><th>Reason / Notes</th><th>User</th></tr></thead><tbody id="historyTableBody">
+      <% var outTypes=['sale','adjustment_remove','adjustment_damaged','adjustment_lost','warranty_replacement_out','sale_correction_replace']; %>
+      <% history.forEach(function(h){ var neutral=h.movement_type==='reclassify'||h.movement_type==='warranty_receive'; var sign=neutral?0:(outTypes.includes(h.movement_type)?-Math.abs(Number(h.quantity||1)):Math.abs(Number(h.quantity||1))); %><tr data-product-id="<%= h.product_id %>" data-movement="<%= h.movement_type %>" data-sign="<%= sign %>" data-date="<%= new Date(h.created_at).toISOString().slice(0,10) %>"><td><%= new Date(h.created_at).toLocaleString() %></td><td><strong><%= h.product_name %></strong><div class="small text-muted"><%= h.product_code||'' %></div></td><td><code><%= h.internal_code||'-' %></code><div class="small"><%= h.serial_number||'' %></div></td><td><span class="badge bg-light text-dark border"><%= h.movement_type %></span></td><td class="text-center fw-bold <%= sign<0?'text-danger':sign>0?'text-success':'text-muted' %>"><%= sign>0?'+':'' %><%= sign %></td><td><%= h.reference||'-' %></td><td><%= h.notes||'-' %></td><td><%= h.user_name||'-' %></td></tr><% }) %>
+      <% if(!history.length){ %><tr><td colspan="8" class="text-center text-muted py-4">No stock history.</td></tr><% } %>
+    </tbody></table></div></div>
+  </div>
+</div>
+
+<% if(canAdjust){ %>
+<div class="modal fade" id="editUnitModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><form method="POST" id="editUnitForm">
+  <div class="modal-header"><div><h5 class="mb-0">Edit Tracked Unit</h5><small class="text-muted">Unit Code cannot be changed.</small></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div class="mb-3"><label>Serial Number</label><input name="serial_number" id="editSerial" class="form-control"></div><div class="row g-2 mb-3"><div class="col-5"><label>Source</label><select name="source_type" id="editSource" class="form-select" onchange="toggleEditDealer()"><option value="own">Own</option><option value="dealer">Dealer</option><option value="legacy">Legacy</option></select></div><div class="col-7 edit-dealer"><label>Dealer</label><select name="supplier_id" id="editSupplier" class="form-select supplier-search-select" data-placeholder="Search dealer / phone / email"><option value="">Select dealer</option><% suppliers.forEach(function(s){ %><option value="<%= s.id %>" data-name="<%= s.name %>" data-phone="<%= s.phone||'' %>" data-email="<%= s.email||'' %>"><%= s.name %><%= s.phone ? ' · '+s.phone : '' %></option><% }) %></select></div></div><div class="mb-3 edit-dealer"><label>Dealer Warranty End</label><input name="dealer_warranty_end" id="editWarrantyEnd" type="date" class="form-control"></div><div><label>Notes</label><textarea name="notes" id="editNotes" class="form-control" rows="3"></textarea></div></div>
+  <div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div>
+</form></div></div></div>
+<% } %>
+
+
+<% if(canCount){ %><div class="modal fade" id="countDetailModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><div><h5 class="mb-0">Stock Count Detail</h5><small id="countDetailTitle" class="text-muted"></small></div><button class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body" id="countDetailBody"></div></div></div></div><% } %>
+
+<script>
+function splitCodes(v){return String(v||'').split(/[\n,;]+/).map(function(x){return x.trim()}).filter(Boolean)}
+function toggleDealerFields(){var dealer=document.getElementById('sourceType').value==='dealer';document.querySelectorAll('.dealer-field').forEach(function(el){el.classList.toggle('d-none',!dealer)})}
+function updateReceiveTracking(){var sel=document.getElementById('receiveProduct'),opt=sel.selectedOptions[0],mode=opt?opt.dataset.tracking:'optional',box=document.querySelector('.receive-serial-field'),hint=document.getElementById('receiveTrackingHint');box.classList.toggle('d-none',mode==='quantity');hint.textContent=mode==='required'?'Serial required: enter one Serial Number for every received unit.':mode==='quantity'?'Quantity only: no factory serial is needed; Unit Codes are generated automatically.':'Serial optional: enter serials only for units that have them.'}
+document.getElementById('receiveStockForm').addEventListener('submit',function(e){var opt=document.getElementById('receiveProduct').selectedOptions[0],mode=opt?opt.dataset.tracking:'optional',qty=Math.max(1,parseInt(document.getElementById('receiveQty').value,10)||1),serials=splitCodes(document.getElementById('receiveSerials').value);if(mode==='required'&&serials.length!==qty){e.preventDefault();return showToast('Serial Required: enter exactly '+qty+' Serial Number(s).','warning')}if(mode==='quantity'&&serials.length){e.preventDefault();return showToast('Quantity-only product does not use Serial Numbers.','warning')}if(new Set(serials.map(function(x){return x.toUpperCase()})).size!==serials.length){e.preventDefault();showToast('Duplicate Serial Number entered.','warning')}})
+function updateAdjustmentFields(){var type=document.getElementById('adjustType')?document.getElementById('adjustType').value:'';document.querySelectorAll('.adjustment-add-serial').forEach(function(el){el.classList.toggle('d-none',type!=='add')});document.querySelectorAll('.adjustment-out-unit').forEach(function(el){el.classList.toggle('d-none',!['remove','damaged','lost'].includes(type))});updateAdjustTracking()}
+function updateAdjustTracking(){var sel=document.getElementById('adjustProduct');if(!sel)return;var opt=sel.selectedOptions[0],mode=opt?opt.dataset.tracking:'optional',stock=opt?opt.dataset.stock:'0',type=document.getElementById('adjustType').value,hint=document.getElementById('adjustTrackingHint');if(!opt||!opt.value){hint.textContent='';return}hint.textContent='Current stock: '+stock+' · '+(mode==='required'?'Serial required':mode==='quantity'?'Quantity only':'Serial optional')+(mode==='required'&&['remove','damaged','lost'].includes(type)?' · Unit/Serial references are required for stock-out adjustments.':'')}
+var activeUnitStatusFilter='';
+function filterUnits(){var q=document.getElementById('unitSearch').value.trim().toLowerCase();document.querySelectorAll('#unitTableBody tr[data-search]').forEach(function(row){var qok=!q||row.dataset.search.includes(q),sok=!activeUnitStatusFilter||(activeUnitStatusFilter==='damaged_lost'?['damaged','lost'].includes(row.dataset.status):row.dataset.status===activeUnitStatusFilter);row.classList.toggle('d-none',!(qok&&sok))})}
+function showInventoryTab(target){var btn=document.querySelector('[data-bs-target="'+target+'"]');if(btn)bootstrap.Tab.getOrCreateInstance(btn).show()}
+function resetInventoryRows(){document.querySelectorAll('#inventoryOverviewBody tr[data-product-id],#unitTableBody tr[data-product-id],#historyTableBody tr[data-product-id]').forEach(function(r){r.classList.remove('d-none')});activeUnitStatusFilter='';if(document.getElementById('unitSearch'))document.getElementById('unitSearch').value=''}
+function setInventoryNote(text){var el=document.getElementById('inventoryFilterNote');if(el)el.textContent=text}
+function markInventoryCard(el){document.querySelectorAll('.inventory-stat-card').forEach(function(c){c.classList.remove('active-filter')});if(el)el.classList.add('active-filter')}
+function applyInventoryCardFilter(type,el){resetInventoryRows();markInventoryCard(el);var rows=Array.from(document.querySelectorAll('#inventoryOverviewBody tr[data-product-id]'));
+ if(type==='products'){showInventoryTab('#stockOverview');setInventoryNote('Showing all product models.');}
+ else if(type==='available'){showInventoryTab('#stockOverview');rows.forEach(function(r){r.classList.toggle('d-none',Number(r.dataset.stock)<=0)});setInventoryNote('Showing products with available stock.');}
+ else if(type==='low'){showInventoryTab('#stockOverview');rows.forEach(function(r){r.classList.toggle('d-none',r.dataset.state!=='low')});setInventoryNote('Showing Low Stock products.');}
+ else if(type==='out'){showInventoryTab('#stockOverview');rows.forEach(function(r){r.classList.toggle('d-none',r.dataset.state!=='out')});setInventoryNote('Showing Out of Stock products.');}
+ else if(type==='damaged'){showInventoryTab('#stockUnits');activeUnitStatusFilter='damaged_lost';filterUnits();setInventoryNote('Showing damaged and lost physical units.');}
+ else if(type==='value'){showInventoryTab('#stockOverview');rows.forEach(function(r){r.classList.toggle('d-none',Number(r.dataset.stock)<=0)});setInventoryNote('Showing stock that contributes to inventory value.');}
+ else if(type==='todayin'){showInventoryTab('#stockHistory');var today=new Date().toISOString().slice(0,10);document.querySelectorAll('#historyTableBody tr[data-product-id]').forEach(function(r){r.classList.toggle('d-none',!(r.dataset.date===today&&Number(r.dataset.sign)>0))});setInventoryNote('Showing today stock-in movements.');}}
+function inventoryQuickSelected(){var sel=document.getElementById('inventoryQuickProduct');if(!sel||!sel.value)return;resetInventoryRows();markInventoryCard(null);var matched=sel.dataset.matchedSerial||sel.dataset.matchedUnitCode||'';var opt=sel.selectedOptions[0];if(matched){showInventoryTab('#stockUnits');document.getElementById('unitSearch').value=matched;filterUnits();setInventoryNote('Showing matched Unit / Serial: '+matched+' · '+(opt?opt.textContent.trim():'Product #'+sel.value));}else{showInventoryTab('#stockOverview');document.querySelectorAll('#inventoryOverviewBody tr[data-product-id]').forEach(function(r){r.classList.toggle('d-none',r.dataset.productId!==sel.value)});setInventoryNote('Showing selected product: '+(opt?opt.textContent.trim():'Product #'+sel.value));}}
+function clearInventoryFilter(){var sel=document.getElementById('inventoryQuickProduct');if(sel){sel.value='';sel.dataset.matchedSerial='';sel.dataset.matchedUnitCode='';var input=sel.parentNode&&sel.parentNode.querySelector('.product-picker-input');if(input)input.value=''}resetInventoryRows();markInventoryCard(null);showInventoryTab('#stockOverview');setInventoryNote('Search by product name, product code, barcode, Unit Code or Serial Number. Click any summary card to open its list directly.');}
+function runInventoryExport(type){var cols='no,product_code,name,model,category,system_qty,status';if(type==='print')window.open('/reports/stock-audit/print?columns='+encodeURIComponent(cols),'_blank');else if(type==='xlsx')window.location.href='/reports/export-excel/stock?columns='+encodeURIComponent(cols);else window.location.href='/reports/export/stock?columns='+encodeURIComponent(cols)}
+<% if(canAdjust){ %>
+function openEditUnit(u){document.getElementById('editUnitForm').action='/inventory/unit/'+u.id+'/update';document.getElementById('editSerial').value=u.serial_number||'';document.getElementById('editSource').value=u.source_type||'legacy';document.getElementById('editSupplier').value=u.supplier_id||'';document.getElementById('editSupplier').dispatchEvent(new Event('change',{bubbles:true}));document.getElementById('editWarrantyEnd').value=u.dealer_warranty_end||'';document.getElementById('editNotes').value=u.notes||'';toggleEditDealer();bootstrap.Modal.getOrCreateInstance(document.getElementById('editUnitModal')).show()}
+function toggleEditDealer(){var yes=document.getElementById('editSource').value==='dealer';document.querySelectorAll('.edit-dealer').forEach(function(el){el.classList.toggle('d-none',!yes)})}
+function toggleClassifyDealer(){var el=document.getElementById('classifySource');if(!el)return;var yes=el.value==='dealer';document.querySelectorAll('.classify-dealer').forEach(function(x){x.classList.toggle('d-none',!yes)})}
+toggleClassifyDealer();
+<% } %>
+toggleDealerFields();updateReceiveTracking();updateAdjustmentFields();
+<% if(canCount){ %>
+function filterCountRows(){var q=countFilter.value.trim().toLowerCase();document.querySelectorAll('#countRows tr').forEach(function(r){r.classList.toggle('d-none',q&&!r.dataset.search.includes(q))})}
+function updateCountDiff(input){var row=input.closest('tr'),cell=row.querySelector('.count-diff');if(input.value===''){cell.textContent='—';cell.className='text-center count-diff text-muted';return}var diff=(parseInt(input.value,10)||0)-(parseInt(row.dataset.system,10)||0);cell.textContent=(diff>0?'+':'')+diff;cell.className='text-center count-diff fw-semibold '+(diff>0?'text-success':diff<0?'text-danger':'text-muted')}
+function saveStockCount(){var items=[];document.querySelectorAll('#countRows tr').forEach(function(r){var input=r.querySelector('.count-actual');if(input.value!=='')items.push({product_id:Number(r.dataset.id),actual_qty:input.value})});if(!items.length)return showToast('Enter at least one Actual quantity.','warning');saveCountBtn.disabled=true;fetch('/inventory/count/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:items,notes:countNotes.value})}).then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.error||'Save failed');showToast('Stock Count '+d.count_code+' saved as Draft.','success');setTimeout(()=>location.reload(),650)}).catch(e=>{showToast(e.message,'danger');saveCountBtn.disabled=false})}
+function viewStockCount(id){countDetailBody.innerHTML='<div class="text-center py-4">Loading...</div>';bootstrap.Modal.getOrCreateInstance(countDetailModal).show();fetch('/inventory/count/'+id).then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.error||'Load failed');countDetailTitle.textContent=d.count.count_code+' · '+d.count.status+' · '+new Date(d.count.created_at).toLocaleString();countDetailBody.innerHTML='<div class="table-responsive"><table class="table table-sm"><thead><tr><th>Product</th><th class="text-center">System</th><th class="text-center">Actual</th><th class="text-center">Difference</th></tr></thead><tbody>'+d.items.map(function(x){var diff=Number(x.difference)||0;return '<tr><td><strong>'+x.product_name+'</strong><div class="small text-muted">'+(x.product_code||'')+' · '+x.tracking_mode+'</div></td><td class="text-center">'+x.system_qty+'</td><td class="text-center">'+x.actual_qty+'</td><td class="text-center fw-semibold '+(diff<0?'text-danger':diff>0?'text-success':'')+'">'+(diff>0?'+':'')+diff+'</td></tr>'}).join('')+'</tbody></table></div>'}).catch(e=>countDetailBody.innerHTML='<div class="alert alert-danger">'+e.message+'</div>')}
+function confirmStockCount(id){confirmDelete('Confirm this physical stock count and apply its differences? Serial Required differences must be adjusted separately with exact serials.',function(){fetch('/inventory/count/'+id+'/confirm',{method:'POST'}).then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.error||'Confirm failed');showToast('Stock Count '+d.count_code+' confirmed.','success');setTimeout(()=>location.reload(),650)}).catch(e=>showToast(e.message,'danger'))})}
+<% } %>
+</script>

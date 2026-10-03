@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="<%= lang==='km'?'km':'en' %>">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title><%= pageTitle||'Computer Store Management System' %></title>
+  <link href="/vendor/bootstrap.min.css" rel="stylesheet">
+  <link href="/css/icons.css" rel="stylesheet">
+  <link href="/css/style.css" rel="stylesheet">
+  <script src="/js/app.js"></script>
+</head><body>
+<% var role=user&&user.role; var manager=['admin','manager'].includes(role); %>
+<aside class="sidebar"><div class="sidebar-header"><div class="logo-icon"><i class="bi bi-shop"></i></div><div class="logo-text">CSMS<small>Store Management</small></div></div><nav class="sidebar-nav">
+<% if(manager){ %>
+  <div class="nav-section-title"><%= t('main') %></div>
+  <% if(hasAccess('dashboard')){ %><a href="/dashboard" class="nav-item <%= activePage==='dashboard'?'active':'' %>"><i class="bi bi-speedometer2"></i><span><%= t('dashboard') %></span></a><% } %>
+  <% if(hasAccess('pos')){ %><a href="/pos" class="nav-item <%= activePage==='pos'?'active':'' %>"><i class="bi bi-cart"></i><span><%= t('pos') %></span></a><% } %>
+  <div class="nav-section-title"><%= t('management') %></div>
+  <% if(hasAccess('products')){ %><a href="/products" class="nav-item <%= activePage==='products'?'active':'' %>"><i class="bi bi-box-seam"></i><span><%= t('products') %></span></a><% } %>
+  <% if(hasAccess('inventory')){ %><a href="/inventory" class="nav-item <%= activePage==='inventory'?'active':'' %>"><i class="bi bi-boxes"></i><span><%= t('stock_control') %></span></a><% } %>
+  <% if(hasAccess('suppliers')){ %><a href="/suppliers/purchases" class="nav-item <%= activePage==='purchases'?'active':'' %>"><i class="bi bi-bag-check"></i><span><%= t('purchases') %></span></a><a href="/suppliers" class="nav-item <%= activePage==='suppliers'?'active':'' %>"><i class="bi bi-truck"></i><span><%= t('suppliers') %></span></a><% } %>
+  <% if(hasAccess('customers')){ %><a href="/customers" class="nav-item <%= activePage==='customers'?'active':'' %>"><i class="bi bi-people"></i><span><%= t('customers') %></span></a><% } %>
+  <% if(hasAccess('repairs')){ %><a href="/repairs" class="nav-item <%= activePage==='repairs'?'active':'' %>"><i class="bi bi-wrench"></i><span><%= t('repairs') %></span></a><% } %>
+  <% if(hasAccess('after_sales')){ %><a href="/after-sales" class="nav-item <%= activePage==='after-sales'?'active':'' %>"><i class="bi bi-shield-check"></i><span><%= t('warranty') %></span></a><% } %>
+  <% if(hasAccess('reports')){ %><div class="nav-section-title"><%= t('analytics') %></div><a href="/reports" class="nav-item <%= activePage==='reports'?'active':'' %>"><i class="bi bi-graph-up"></i><span><%= t('reports') %></span></a><% } %>
+<% } %>
+<% if(role==='cashier' && hasAccess('pos')){ %><div class="nav-section-title">Sale</div><a href="/pos" class="nav-item <%= activePage==='pos'?'active':'' %>"><i class="bi bi-cart"></i><span><%= t('pos') %></span></a><% } %>
+<% if(role==='technician' && hasAccess('repairs')){ %><div class="nav-section-title">Technician</div><a href="/repairs" class="nav-item <%= activePage==='repairs'?'active':'' %>"><i class="bi bi-wrench"></i><span><%= t('repairs') %></span></a><% } %>
+<% if(role==='stock'){ %><div class="nav-section-title">Stock</div><% if(hasAccess('inventory')){ %><a href="/inventory" class="nav-item <%= activePage==='inventory'?'active':'' %>"><i class="bi bi-boxes"></i><span><%= t('stock_control') %></span></a><% } %><% if(hasAccess('after_sales')){ %><a href="/after-sales" class="nav-item <%= activePage==='after-sales'?'active':'' %>"><i class="bi bi-search"></i><span><%= t('warranty') %></span></a><% } %><% if(hasAccess('reports')){ %><a href="/reports" class="nav-item <%= activePage==='reports'?'active':'' %>"><i class="bi bi-clipboard-data"></i><span><%= t('stock_report') %></span></a><% } %><% } %>
+<% if(role==='admin' && hasAccess('settings')){ %><div class="nav-section-title"><%= t('system') %></div><a href="/settings" class="nav-item <%= activePage==='settings'?'active':'' %>"><i class="bi bi-gear"></i><span><%= t('settings') %></span></a><% } %>
+</nav></aside>
+<main class="main-content">
+  <div class="top-header"><div><div class="page-title"><%= pageTitle||'Dashboard' %></div><div class="breadcrumb"><span><%= role %></span><span>/</span><span><%= pageTitle||'' %></span></div></div><div class="header-actions"><div class="dropdown"><button class="user-profile dropdown-toggle bg-white" type="button" data-bs-toggle="dropdown"><div class="user-avatar"><%= user.name.charAt(0) %></div><div class="user-info text-start"><div class="name"><%= user.name %></div><div class="role"><%= user.role %></div></div></button><ul class="dropdown-menu dropdown-menu-end shadow"><li><span class="dropdown-item-text small text-muted"><%= user.email %></span></li><li><hr class="dropdown-divider"></li><li><form method="POST" action="/auth/logout" class="m-0"><button class="dropdown-item text-danger" type="submit"><i class="bi bi-box-arrow-right me-2"></i><%= t('sign_out') %></button></form></li></ul></div></div></div>
+  <div class="page-content"><% if(typeof error!=='undefined'&&error){ %><div class="alert alert-danger"><%= error %></div><% } %><%- body %></div>
+</main>
+<div class="toast-container" id="toastContainer"></div>
+<div class="modal fade" id="confirmModal" tabindex="-1"><div class="modal-dialog modal-sm modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5><i class="bi bi-exclamation-triangle text-warning"></i> Confirm</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><p id="confirmMsg" class="mb-0"></p></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal"><%= t('cancel') %></button><button type="button" class="btn btn-danger" id="confirmAction"><%= t('delete') %></button></div></div></div></div>
+<script src="/vendor/bootstrap.bundle.min.js"></script>
+<script>
+var confirmCallback=null;document.getElementById('confirmAction').addEventListener('click',function(){var m=bootstrap.Modal.getInstance(document.getElementById('confirmModal'));if(m)m.hide();if(confirmCallback){var cb=confirmCallback;confirmCallback=null;cb()}});function confirmDelete(msg,cb){confirmMsg.textContent=msg;confirmCallback=cb;bootstrap.Modal.getOrCreateInstance(confirmModal).show()}function showToast(message,type){type=type||'primary';var el=document.createElement('div');el.className='toast show toast-'+type;el.innerHTML='<span class="toast-message"></span>';el.querySelector('.toast-message').textContent=message;toastContainer.appendChild(el);setTimeout(function(){el.remove()},3500)}
+</script>
+</body></html>

@@ -1,0 +1,46 @@
+<% var p=products[0]; %>
+<div class="d-flex justify-content-between align-items-center mt-3 mb-3 flex-wrap gap-2"><div><h2 class="mb-1"><i class="bi bi-pencil-square"></i> Edit Product</h2><div class="text-muted small">Same clean layout as Add Product. Stock quantity stays read-only.</div></div><a href="/products" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a></div>
+<form method="POST" action="/products/update/<%= p.id %>" enctype="multipart/form-data" id="editProductForm">
+  <div class="card product-editor-page product-editor-page-compact"><div class="card-body product-editor-body">
+    <div class="product-form-section compact-section">
+      <div class="section-heading"><span class="section-step">1</span><div><div class="section-title mb-0">Product information</div><div class="section-subtitle">Edit model/master data</div></div></div>
+      <div class="row g-2 product-form-grid">
+        <div class="col-md-6"><label class="form-label">Product Name <span class="text-danger">*</span></label><input name="name" class="form-control" value="<%= p.name %>" required></div>
+        <div class="col-md-3"><label class="form-label">Model</label><input name="model" class="form-control" value="<%= p.model||'' %>"></div>
+        <div class="col-md-3"><label class="form-label">Brand</label><input name="brand" class="form-control" value="<%= p.brand||'' %>"></div>
+        <div class="col-md-3"><label class="form-label">Product Code</label><input name="product_code" class="form-control text-uppercase" value="<%= p.product_code||('PRD-'+String(p.id).padStart(5,'0')) %>" required></div>
+        <div class="col-md-3"><label class="form-label">Barcode</label><input name="barcode" class="form-control" autocomplete="off" value="<%= p.barcode||'' %>" placeholder="Optional scan / type"></div>
+        <div class="col-md-3"><label class="form-label">Category</label><select name="category_id" class="form-select" required><% categories.forEach(function(c){ %><option value="<%= c.id %>" <%= Number(p.category_id)===Number(c.id)?'selected':'' %>><%= c.name %></option><% }) %></select></div>
+        <div class="col-md-3"><label class="form-label">Unit Tracking</label><select name="tracking_mode" id="editTrackingMode" class="form-select" onchange="applyEditTracking()"><option value="optional" <%= (p.tracking_mode||'optional')==='optional'?'selected':'' %>>Serial optional</option><option value="required" <%= p.tracking_mode==='required'?'selected':'' %>>Serial required</option><option value="quantity" <%= p.tracking_mode==='quantity'?'selected':'' %>>Quantity only</option></select></div>
+      </div>
+    </div>
+    <div class="product-form-section compact-section mt-2">
+      <div class="section-heading"><span class="section-step">2</span><div><div class="section-title mb-0">Price & stock settings</div><div class="section-subtitle">Current stock cannot be changed here</div></div></div>
+      <div class="row g-2 product-form-grid">
+        <div class="col-6 col-md-2"><label class="form-label">Buy Price</label><input name="buy_price" type="number" step="0.01" min="0" class="form-control" value="<%= p.buy_price %>"></div>
+        <div class="col-6 col-md-2"><label class="form-label">Sell Price</label><input name="sell_price" type="number" step="0.01" min="0" class="form-control" value="<%= p.sell_price %>" required></div>
+        <div class="col-6 col-md-2"><label class="form-label">Current Stock</label><input class="form-control bg-light" value="<%= p.stock_qty %>" readonly></div>
+        <div class="col-6 col-md-2"><label class="form-label">Min Stock</label><input name="min_stock" type="number" min="0" class="form-control" value="<%= p.min_stock %>"></div>
+        <div class="col-6 col-md-2"><label class="form-label">Warranty</label><div class="input-group"><input name="warranty_months" type="number" min="0" class="form-control" value="<%= p.warranty_months %>"><span class="input-group-text">mo</span></div></div>
+        <div class="col-6 col-md-2"><label class="form-label">Photo</label><label class="file-compact"><i class="bi bi-image"></i><span>Replace</span><input name="image" type="file" accept="image/*"></label></div>
+      </div>
+    </div>
+    <div class="product-form-section compact-section mt-2" id="editSerialSection">
+      <div class="section-heading serial-heading"><span class="section-step">3</span><div class="flex-grow-1"><div class="section-title mb-0">In-stock Serial Numbers</div><div class="section-subtitle">Press <strong>Enter</strong> to jump to the next unit. Empty field means “leave as is / no serial”.</div></div><span class="serial-count-pill"><%= units.length %> unit(s)</span></div>
+      <input type="hidden" name="serial_updates_json" id="serialUpdatesJson" value="[]">
+      <div id="editSerialRows" class="serial-row-list clean-serial-list edit-serial-list">
+        <% units.forEach(function(u,i){ %><div class="serial-entry-row edit-serial-row" data-unit-id="<%= u.id %>" data-original="<%= u.serial_number||'' %>"><span class="serial-row-no"><%= i+1 %></span><div class="serial-unit-code"><code><%= u.internal_code %></code></div><input class="form-control edit-serial-input" value="<%= u.serial_number||'' %>" placeholder="No serial / type serial"><span class="serial-status-dot" title="In stock"></span></div><% }) %>
+        <% if(!units.length){ %><div class="text-muted small py-2">No in-stock unit to edit. Use Inventory &amp; Stock / Purchases to receive units.</div><% } %>
+      </div>
+    </div>
+  </div>
+  <div class="card-footer bg-white d-flex justify-content-between align-items-center gap-2 flex-wrap"><div class="small text-muted"><i class="bi bi-info-circle"></i> Add/remove quantity through Inventory &amp; Stock or Purchases.</div><div class="d-flex gap-2"><a href="/products" class="btn btn-light">Cancel</a><button class="btn btn-primary px-4"><i class="bi bi-check-lg"></i> Save Changes</button></div></div>
+  </div>
+</form>
+<script>
+function applyEditTracking(){editSerialSection.classList.toggle('d-none',editTrackingMode.value==='quantity')}
+var editInputs=Array.from(document.querySelectorAll('.edit-serial-input'));
+editInputs.forEach(function(input,idx){input.addEventListener('keydown',function(e){if(e.key==='Enter'){e.preventDefault();var next=editInputs[idx+1];if(next){next.focus();next.select()}else{document.querySelector('#editProductForm button[type="submit"]').focus()}}})});
+editProductForm.addEventListener('submit',function(e){var updates=[],allFinal=[],mode=editTrackingMode.value;document.querySelectorAll('.edit-serial-row').forEach(function(row){var input=row.querySelector('.edit-serial-input'),value=input.value.trim(),original=row.dataset.original||'';var finalValue=value||original;if(finalValue)allFinal.push(finalValue.toUpperCase());if(value!==original && value!=='')updates.push({id:Number(row.dataset.unitId),serial:value})});if(new Set(allFinal).size!==allFinal.length){e.preventDefault();return showToast('Duplicate Serial Number in this product.','warning')}if(mode==='required'){var missing=Array.from(document.querySelectorAll('.edit-serial-row')).some(function(row){var input=row.querySelector('.edit-serial-input');return !(input.value.trim()||row.dataset.original)});if(missing){e.preventDefault();return showToast('Serial Required: every in-stock unit must have a Serial Number.','warning')}}serialUpdatesJson.value=JSON.stringify(updates)});
+applyEditTracking();
+</script>

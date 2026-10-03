@@ -1,0 +1,9 @@
+{
+  "host": "192.168.1.10",
+  "port": 5432,
+  "user": "computer_store_user",
+  "password": "CHANGE_ME",
+  "database": "computer_store",
+  "ssl": false,
+  "max": 20
+}

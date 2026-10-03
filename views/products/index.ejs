@@ -1,0 +1,93 @@
+<div class="d-flex justify-content-between align-items-center mt-3 mb-3 flex-wrap gap-2">
+  <div><h2 class="mb-1"><i class="bi bi-box-seam"></i> <%= t('products') %></h2><div class="text-muted small">Create each model once. Stock units and serials stay traceable.</div></div>
+  <div class="d-flex gap-2"><% if(hasPermission('product_edit')){ %><button class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#categoryModal"><i class="bi bi-tags"></i> Categories</button><button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#productModal"><i class="bi bi-plus-lg"></i> <%= t('add') %> Product</button><% } %></div>
+</div>
+<% if (errorMessage) { %><div class="alert alert-danger"><%= errorMessage %></div><% } %>
+<% if (success) { %><div class="alert alert-success"><%= success %></div><% } %>
+
+<div class="modal fade" id="productModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered product-editor-dialog"><div class="modal-content product-editor-modal">
+    <form method="POST" action="/products/create" enctype="multipart/form-data" id="addProductForm" novalidate>
+      <div class="modal-header product-editor-header">
+        <div><h5 class="mb-1"><i class="bi bi-plus-square me-1"></i> Add Product</h5><div class="small text-muted">Clean product master + optional per-unit serial entry.</div></div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body product-editor-body">
+        <div class="product-form-section compact-section">
+          <div class="section-heading"><span class="section-step">1</span><div><div class="section-title mb-0">Product information</div><div class="section-subtitle">Model, code, category and tracking rule</div></div></div>
+          <div class="row g-2 product-form-grid">
+            <div class="col-md-6"><label class="form-label">Product Name <span class="text-danger">*</span></label><input name="name" class="form-control" placeholder="e.g. ASUS Vivobook 15" required></div>
+            <div class="col-md-3"><label class="form-label">Model</label><input name="model" class="form-control" placeholder="e.g. X1504ZA"></div>
+            <div class="col-md-3"><label class="form-label">Brand</label><input name="brand" class="form-control" placeholder="e.g. ASUS"></div>
+            <div class="col-md-3"><label class="form-label">Product Code</label><div class="input-group"><input name="product_code" id="productCodeInput" class="form-control text-uppercase" placeholder="Auto / type"><button class="btn btn-outline-primary" type="button" onclick="generateProductCode(this)" title="Generate code"><i class="bi bi-magic"></i></button></div></div>
+            <div class="col-md-3"><label class="form-label">Barcode</label><input name="barcode" class="form-control" autocomplete="off" placeholder="Optional scan / type"></div>
+            <div class="col-md-3"><label class="form-label">Category <span class="text-danger">*</span></label><select name="category_id" class="form-select" required><option value="">Select</option><% categories.forEach(function(c){ %><option value="<%= c.id %>"><%= c.name %></option><% }) %></select></div>
+            <div class="col-md-3"><label class="form-label">Unit Tracking</label><select name="tracking_mode" id="trackingMode" class="form-select" onchange="applyTrackingMode()"><option value="optional" selected>Serial optional</option><option value="required">Serial required</option><option value="quantity">Quantity only</option></select></div>
+          </div>
+        </div>
+
+        <div class="product-form-section compact-section mt-2">
+          <div class="section-heading"><span class="section-step">2</span><div><div class="section-title mb-0">Price & stock setup</div><div class="section-subtitle">Small, even fields for quick entry</div></div></div>
+          <div class="row g-2 product-form-grid">
+            <div class="col-6 col-md-2"><label class="form-label">Buy Price</label><input name="buy_price" type="number" min="0" step="0.01" class="form-control" value="0"></div>
+            <div class="col-6 col-md-2"><label class="form-label">Sell Price <span class="text-danger">*</span></label><input name="sell_price" type="number" min="0" step="0.01" class="form-control" value="0" required></div>
+            <div class="col-6 col-md-2"><label class="form-label">Warranty</label><div class="input-group"><input name="warranty_months" type="number" min="0" class="form-control" value="0"><span class="input-group-text">mo</span></div></div>
+            <div class="col-6 col-md-2"><label class="form-label">Min Stock</label><input name="min_stock" type="number" min="0" class="form-control" value="5"></div>
+            <div class="col-6 col-md-2"><label class="form-label">Opening Stock</label><input name="stock_qty" id="openingStock" type="number" min="0" class="form-control" value="0"></div>
+            <div class="col-6 col-md-2"><label class="form-label">Photo</label><label class="file-compact"><i class="bi bi-image"></i><span>Choose</span><input name="image" type="file" accept="image/*"></label></div>
+          </div>
+        </div>
+
+        <div class="product-form-section compact-section mt-2" id="serialSection">
+          <div class="section-heading serial-heading"><span class="section-step">3</span><div class="flex-grow-1"><div class="section-title mb-0">Serial Numbers</div><div class="section-subtitle">Type a serial and press <strong>Enter</strong> to move to a new row. Empty row is skipped when saving.</div></div><span class="serial-count-pill"><span id="serialFilledCount">0</span> entered</span></div>
+          <input type="hidden" name="serial_numbers_json" id="serialNumbersJson" value="[]">
+          <div id="serialRows" class="serial-row-list clean-serial-list"></div>
+          <button type="button" class="btn btn-sm btn-link text-decoration-none px-0 mt-1" onclick="addSerialRow('',true)"><i class="bi bi-plus-circle"></i> Add another serial</button>
+        </div>
+      </div>
+      <div class="modal-footer product-editor-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal"><%= t('cancel') %></button><button class="btn btn-primary px-4" type="submit"><i class="bi bi-check-lg"></i> <%= t('save') %></button></div>
+    </form>
+  </div></div>
+</div>
+
+<div class="modal fade" id="categoryModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5 class="mb-0"><i class="bi bi-tags"></i> Categories</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <form method="POST" action="/products/category/create" class="row g-2 mb-3"><div class="col-5"><input name="name" class="form-control" placeholder="Category name" required></div><div class="col-5"><input name="description" class="form-control" placeholder="Description"></div><div class="col-2"><button class="btn btn-primary w-100"><i class="bi bi-plus-lg"></i></button></div></form>
+    <div class="list-group category-list"><% categories.forEach(function(c){ %><div class="list-group-item d-flex justify-content-between align-items-center gap-2"><div class="min-w-0"><strong><%= c.name %></strong><div class="small text-muted text-truncate"><%= c.description || 'No description' %></div></div><div class="d-flex gap-1 flex-shrink-0"><button class="btn btn-sm btn-outline-primary" onclick='openCategoryEdit(<%- JSON.stringify({id:c.id,name:c.name,description:c.description||""}).replace(/</g,"\\u003c") %>)'><i class="bi bi-pencil"></i></button><button class="btn btn-sm btn-outline-danger" onclick="deleteCategory(<%= c.id %>, <%- JSON.stringify(c.name) %>)"><i class="bi bi-trash"></i></button></div></div><% }) %></div>
+  </div>
+</div></div></div>
+
+<div class="modal fade" id="categoryEditModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><form method="POST" id="categoryEditForm"><div class="modal-header"><h5>Edit Category</h5><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body"><div class="mb-3"><label>Name</label><input id="catEditName" name="name" class="form-control" required></div><div><label>Description</label><textarea id="catEditDescription" name="description" class="form-control" rows="3"></textarea></div></div><div class="modal-footer"><button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button><button class="btn btn-primary">Save</button></div></form></div></div></div>
+
+<div class="modal fade" id="serialModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content"><div class="modal-header"><div><h5 class="mb-0">Tracked Units</h5><small class="text-muted" id="serialModalTitle"></small></div><button class="btn-close" type="button" data-bs-dismiss="modal"></button></div><div class="modal-body p-0"><div class="table-responsive" style="max-height:460px"><table class="table table-sm table-hover align-middle mb-0"><thead class="table-light sticky-top"><tr><th>Serial Number</th><th>Unit Code</th><th>Status</th><th>Received</th><th>Sold</th><th>Dealer</th></tr></thead><tbody id="serialModalBody"></tbody></table></div></div></div></div></div>
+
+<div class="card"><div class="card-body p-0 table-responsive"><table class="table table-hover align-middle mb-0 compact-table product-table"><thead class="table-dark"><tr><th>Photo</th><th>Product / Model</th><th>Product Code / Serials</th><th>Category</th><th class="text-end">Buy</th><th class="text-end">Sell</th><th class="text-center">Stock</th><th class="text-center">Status</th><th class="text-end">Actions</th></tr></thead><tbody>
+<% products.forEach(function(p){ var state=Number(p.stock_qty)<=0?'out':(Number(p.stock_qty)<=Number(p.min_stock)?'low':'ok'); %><tr>
+  <td><% if(p.image){ %><img class="product-thumb" src="/images/products/<%= p.image %>" alt=""><% } else { %><div class="product-thumb product-thumb-empty"><i class="bi bi-image"></i></div><% } %></td>
+  <td><div class="fw-semibold"><%= p.name %></div><div class="small text-muted"><%= [p.brand,p.model].filter(Boolean).join(' · ') || '-' %></div></td>
+  <td><code><%= p.product_code || ('PRD-'+String(p.id).padStart(5,'0')) %></code><div class="small text-muted mt-1"><%= p.tracking_mode==='required'?'Serial required':p.tracking_mode==='quantity'?'Quantity only':'Serial optional' %></div><div class="mt-1"><button class="btn btn-link btn-sm p-0 text-decoration-none" onclick="showSerials(<%= p.id %>)"><i class="bi bi-upc-scan"></i> <%= p.unit_count||0 %> Unit(s) · <%= p.serial_count||0 %> serial</button></div></td>
+  <td><%= p.category_name %></td><td class="text-end"><%= money(p.buy_price) %></td><td class="text-end fw-semibold"><%= money(p.sell_price) %></td><td class="text-center fw-bold"><%= p.stock_qty %></td>
+  <td class="text-center"><span class="stock-pill stock-<%= state %>"><%= state==='out'?'OUT STOCK':state==='low'?'LOW':'OK' %></span></td>
+  <td class="text-end"><div class="action-group justify-content-end"><% if(hasPermission('product_edit')){ %><a class="btn btn-sm btn-outline-primary" href="/products/edit/<%= p.id %>" title="Edit"><i class="bi bi-pencil"></i></a><% } %><% if(hasPermission('product_delete')){ %><button class="btn btn-sm btn-outline-danger" onclick="deleteProduct(<%= p.id %>, <%- JSON.stringify(p.name) %>, <%= Number(p.stock_qty)||0 %>)" title="Delete"><i class="bi bi-trash"></i></button><% } %></div></td>
+</tr><% }) %>
+</tbody></table></div></div>
+
+<script>
+var serialIndex=0;
+function escapeSerial(v){return String(v||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;')}
+function generateProductCode(btn){btn.disabled=true;fetch('/products/generate-code').then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.message||'Generate failed');productCodeInput.value=d.code}).catch(e=>showToast(e.message,'danger')).finally(()=>btn.disabled=false)}
+function getSerialValues(){return Array.from(document.querySelectorAll('#serialRows .serial-input')).map(x=>x.value.trim()).filter(Boolean)}
+function updateSerialCount(){var values=getSerialValues();serialFilledCount.textContent=values.length;var qty=Math.max(0,parseInt(openingStock.value,10)||0);if(values.length>qty)openingStock.value=values.length;}
+function renumberSerialRows(){Array.from(document.querySelectorAll('#serialRows .serial-entry-row')).forEach(function(r,i){r.querySelector('.serial-row-no').textContent=i+1});updateSerialCount()}
+function addSerialRow(value,focus){if(trackingMode.value==='quantity')return null;serialIndex++;var row=document.createElement('div');row.className='serial-entry-row serial-entry-clean';row.innerHTML='<span class="serial-row-no">'+serialIndex+'</span><input type="text" class="form-control serial-input" autocomplete="off" placeholder="Scan / type serial then press Enter" value="'+escapeSerial(value||'')+'"><button class="btn btn-light serial-remove" type="button" title="Remove"><i class="bi bi-x-lg"></i></button>';var input=row.querySelector('input');row.querySelector('button').onclick=function(){var rows=document.querySelectorAll('#serialRows .serial-entry-row');if(rows.length===1){input.value='';input.focus()}else{row.remove();renumberSerialRows()}};input.addEventListener('input',updateSerialCount);input.addEventListener('keydown',function(e){if(e.key!=='Enter')return;e.preventDefault();if(!input.value.trim()){return input.focus()}var rows=Array.from(document.querySelectorAll('#serialRows .serial-input')),idx=rows.indexOf(input),next=rows[idx+1];if(!next){next=addSerialRow('',false).querySelector('input')}next.focus();next.select()});serialRows.appendChild(row);renumberSerialRows();if(focus)setTimeout(function(){input.focus()},30);return row}
+function applyTrackingMode(){var mode=trackingMode.value;serialSection.classList.toggle('d-none',mode==='quantity');if(mode==='quantity'){serialRows.innerHTML='';serialFilledCount.textContent='0'}else if(!serialRows.querySelector('.serial-entry-row')){addSerialRow('',false)}}
+openingStock.addEventListener('input',function(){if(Number(openingStock.value)<getSerialValues().length)openingStock.value=getSerialValues().length});
+addProductForm.addEventListener('submit',function(e){var mode=trackingMode.value,serials=getSerialValues(),qty=Math.max(0,Number(openingStock.value)||0);if(mode==='quantity'&&serials.length){e.preventDefault();return showToast('Quantity-only products do not use Serial Numbers.','warning')}if(serials.length>qty){openingStock.value=serials.length;qty=serials.length}if(mode==='required'&&serials.length!==qty){e.preventDefault();return showToast('Serial Required: Opening Stock '+qty+' needs exactly '+qty+' Serial Number(s). You entered '+serials.length+'.','warning')}var upper=serials.map(x=>x.toUpperCase());if(new Set(upper).size!==upper.length){e.preventDefault();return showToast('Duplicate Serial Number in the form.','warning')}serialNumbersJson.value=JSON.stringify(serials)});
+document.getElementById('productModal').addEventListener('shown.bs.modal',function(){var first=document.querySelector('#addProductForm input[name="name"]');if(first)first.focus()});
+applyTrackingMode();
+function showSerials(id){var body=serialModalBody;body.innerHTML='<tr><td colspan="6" class="text-center py-4">Loading...</td></tr>';bootstrap.Modal.getOrCreateInstance(serialModal).show();fetch('/products/'+id+'/serials').then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.message||'Load failed');serialModalTitle.textContent=d.product.name+(d.product.model?' · '+d.product.model:'')+' · '+(d.product.product_code||'');body.innerHTML=d.units.length?d.units.map(u=>'<tr><td><strong>'+(u.serial_number||'-')+'</strong></td><td><code>'+u.internal_code+'</code></td><td><span class="badge bg-light text-dark border">'+u.status+'</span></td><td>'+(u.received_at?new Date(u.received_at).toLocaleDateString():'-')+'</td><td>'+(u.sold_at?new Date(u.sold_at).toLocaleDateString():'-')+'</td><td>'+(u.supplier_name||'-')+'</td></tr>').join(''):'<tr><td colspan="6" class="text-center text-muted py-4">No tracked units yet.</td></tr>'}).catch(e=>{body.innerHTML='<tr><td colspan="6" class="text-danger text-center py-4">'+e.message+'</td></tr>'})}
+function openCategoryEdit(c){categoryEditForm.action='/products/category/update/'+c.id;catEditName.value=c.name||'';catEditDescription.value=c.description||'';bootstrap.Modal.getOrCreateInstance(categoryEditModal).show()}
+function deleteCategory(id,name){confirmDelete('Delete category "'+name+'"? Category must have no active products.',function(){fetch('/products/category/delete/'+id,{method:'POST'}).then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.message||'Delete failed');location.reload()}).catch(e=>showToast(e.message,'warning'))})}
+function deleteProduct(id,name,stock){var extra=Number(stock)>0?' Current stock '+stock+' will be preserved in history and restored with the product.':'';confirmDelete('Move product \"'+name+'\" to the Recycle Bin?'+extra,function(){fetch('/products/delete/'+id,{method:'POST'}).then(r=>r.json()).then(d=>{if(!d.success)throw new Error(d.message||'Delete failed');showToast('Product moved to Recycle Bin.','success');setTimeout(()=>location.reload(),350)}).catch(e=>showToast(e.message,'danger'))})}
+</script>

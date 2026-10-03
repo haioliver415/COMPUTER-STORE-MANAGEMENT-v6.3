@@ -1,0 +1,19 @@
+V6.3 TEST CHECKLIST
+===================
+[ ] npm start installs missing dependencies once and starts Electron.
+[ ] With PostgreSQL stopped/wrong credentials, Database Setup opens instead of app quitting.
+[ ] Database Setup Test Connection succeeds with valid host/port/database/user/password.
+[ ] Save Connection initializes schema and returns to login.
+[ ] Fresh empty database has no sample products/customers/suppliers/sales/purchases/repairs.
+[ ] Settings > Backup downloads a V6.3 .sql file.
+[ ] Settings > Restore requires .sql + text RESTORE, creates safety backup, restores data, logs out.
+[ ] Second PC connects to the same PostgreSQL host and sees the same data.
+[ ] Product Delete opens centered confirmation and moves product to Recycle Bin even with stock.
+[ ] Restore Product returns product and preserved stock/history.
+[ ] Recycle auto cleanup does not archive deleted products that still have stock.
+[ ] Inventory & Stock summary boxes are compact and clickable.
+[ ] Repair ticket accepts Service Fee and Parts Cost and shows correct total.
+[ ] Repair Details updates Fee/Parts and generated invoice uses the same total.
+[ ] Admin can enable/disable users, module access and action permissions.
+[ ] A blocked action returns Access/Permission Disabled.
+[ ] Tables/rows/columns remain aligned without unwanted text wrapping.

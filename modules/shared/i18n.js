@@ -1,0 +1,50 @@
+const dictionaries = {
+  en: {
+    dashboard:'Dashboard', pos:'POS Sales', products:'Products', suppliers:'Suppliers', customers:'Customers', repairs:'Repair Service',
+    warranty:'Warranty / After-Sales', stock_control:'Inventory & Stock', purchases:'Purchases', reports:'Reports', settings:'Settings',
+    main:'Main', management:'Management', analytics:'Analytics', system:'System', home:'Home', sign_out:'Sign out',
+    add:'Add', save:'Save', edit:'Edit', delete:'Delete', cancel:'Cancel', actions:'Actions', status:'Status', search:'Search', print:'Print', finish:'Finish', clear:'Clear',
+    language:'Language', english:'English', khmer:'Khmer', store_information:'Store Information', users:'Users', backup:'Database Backup', system_activity:'System Activity',
+    pos_hint:'Choose an item, quantity and customer. Stock source is handled automatically by the system.', all_categories:'All Categories',
+    search_product_placeholder:'Search Product Code / Serial / Unit Code / name / model...', cart:'Cart', total:'Total', checkout:'Checkout', customer:'Customer', walk_in:'Walk-in',
+    payment_method:'Payment Method', exchange_rate:'Exchange rate', total_usd:'Total USD', total_riel:'Total Riel', complete_sale:'Complete Sale',
+    payment_confirmation:'Payment Confirmation', total_amount:'Total Amount', optional:'optional', print_pdf_hint:'Print opens a normal receipt. For testing, choose Save as PDF in the print dialog.',
+    complete_print:'Complete & Print', no_products:'No products found.', stock:'Stock', out_stock:'Out of stock', not_enough_stock:'Not enough stock.',
+    cart_empty:'Cart is empty', add_items_first:'Add items first.', select_credit_customer:'Select a customer for Credit sale.',
+    product_master_hint:'One product/model is stored once. Product Code identifies the model; Serial Number identifies each physical unit.',
+    one_model_many_serials:'One model can have many physical units with different Serial Numbers.', serial_rows_hint:'Add a row for each unit that has a Serial Number. Serial must be unique.',
+    serial_optional_hint:'Serial is optional. Units without serial can still be added using Opening Stock quantity.',
+    warranty_search_hint:'Search sold or stocked units and check sale date, source, dealer and remaining warranty.', stock_report:'Stock Report',
+    find_sold_item:'Find Item / Warranty', search_by_serial_model_date:'Search by Serial, Unit Code, Product Code, Model, Sale Code, customer/dealer, or sale date/month/year.',
+    sale_date:'Sale Date', sale_month:'Sale Month', year:'Year', received_date:'Received Date', item_warranty_results:'Item / Warranty Results', sold:'Sold', no_matching_item:'No matching item found.',
+    stock_report_hint:'Stock counting list with search, print and selectable CSV/Excel columns.', reports_hint:'Sales, Repair and physical Stock reconciliation reports.',
+    product_models:'Product Models', system_stock:'System Stock', physical_stock_reconciliation:'Physical Stock Reconciliation',
+    physical_stock_hint:'Use this list to count real items and compare Actual Qty with System Qty.', print_count_sheet:'Print Count Sheet', choose_columns:'Choose export/print columns',
+    count_sheet_footer:'Print the count sheet for physical counting, or export selected columns to CSV/Excel.'
+  },
+  km: {
+    dashboard:'ផ្ទាំងសង្ខេប', pos:'POS Sales', products:'ផលិតផល', suppliers:'អ្នកផ្គត់ផ្គង់', customers:'អតិថិជន', repairs:'Repair Service',
+    warranty:'Warranty / After-Sales', stock_control:'គ្រប់គ្រងស្តុក', purchases:'ការទិញចូល', reports:'របាយការណ៍', settings:'ការកំណត់',
+    main:'មេ', management:'ការគ្រប់គ្រង', analytics:'របាយការណ៍', system:'ប្រព័ន្ធ', home:'ទំព័រដើម', sign_out:'ចាកចេញ',
+    add:'បន្ថែម', save:'រក្សាទុក', edit:'កែ', delete:'លុប', cancel:'បោះបង់', actions:'សកម្មភាព', status:'ស្ថានភាព', search:'ស្វែងរក', print:'បោះពុម្ព', finish:'បញ្ចប់', clear:'សម្អាត',
+    language:'ភាសា', english:'English', khmer:'ខ្មែរ', store_information:'ព័ត៌មានហាង', users:'អ្នកប្រើប្រាស់', backup:'Database Backup', system_activity:'ប្រវត្តិសកម្មភាព',
+    pos_hint:'ជ្រើសអីវ៉ាន់ ចំនួន និងអតិថិជន។ ប្រភព Stock ត្រូវបានប្រព័ន្ធជ្រើសដោយស្វ័យប្រវត្តិ។', all_categories:'ប្រភេទទាំងអស់',
+    search_product_placeholder:'ស្វែងរក Product Code / Serial / Unit Code / ឈ្មោះ / Model...', cart:'កន្ត្រក', total:'សរុប', checkout:'គិតលុយ', customer:'អតិថិជន', walk_in:'ភ្ញៀវទូទៅ',
+    payment_method:'វិធីបង់ប្រាក់', exchange_rate:'អត្រាប្តូរប្រាក់', total_usd:'សរុប USD', total_riel:'សរុបរៀល', complete_sale:'បញ្ចប់ការលក់',
+    payment_confirmation:'បញ្ជាក់ការបង់ប្រាក់', total_amount:'ចំនួនសរុប', optional:'មិនចាំបាច់', print_pdf_hint:'ពេល Print នឹងចេញ Receipt ធម្មតា។ សម្រាប់សាកល្បង អាចជ្រើស Save as PDF។',
+    complete_print:'បញ្ចប់ និង Print', no_products:'រកមិនឃើញផលិតផល។', stock:'Stock', out_stock:'អស់ Stock', not_enough_stock:'Stock មិនគ្រប់។',
+    cart_empty:'មិនទាន់មានអីវ៉ាន់ក្នុងកន្ត្រក', add_items_first:'សូមបន្ថែមអីវ៉ាន់ជាមុន។', select_credit_customer:'សូមជ្រើសអតិថិជនសម្រាប់ Credit sale។',
+    product_master_hint:'Product/Model មួយរក្សាទុកតែមួយ។ Product Code សម្គាល់ Model ហើយ Serial Number សម្គាល់ unit ជាក់ស្តែងនីមួយៗ។',
+    one_model_many_serials:'Model មួយអាចមាន unit ច្រើនដែលមាន Serial Number ខុសៗគ្នា។', serial_rows_hint:'បន្ថែមមួយជួរសម្រាប់ unit នីមួយៗដែលមាន Serial Number។ Serial មិនអាចជាន់គ្នា។',
+    serial_optional_hint:'Serial មិនចាំបាច់មានគ្រប់ unit ទេ។ Unit ដែលគ្មាន Serial អាចបញ្ចូលតាម Opening Stock បាន។',
+    warranty_search_hint:'ស្វែងរកអីវ៉ាន់ដែលលក់ ឬនៅ Stock ដើម្បីមើលថ្ងៃលក់ ប្រភព Dealer និង Warranty នៅសល់។', stock_report:'របាយការណ៍ Stock',
+    find_sold_item:'ស្វែងរកអីវ៉ាន់ / Warranty', search_by_serial_model_date:'ស្វែងរកតាម Serial, Unit Code, Product Code, Model, Sale Code, អតិថិជន/Dealer ឬថ្ងៃ-ខែ-ឆ្នាំលក់។',
+    sale_date:'ថ្ងៃលក់', sale_month:'ខែលក់', year:'ឆ្នាំ', received_date:'ថ្ងៃទទួលចូល', item_warranty_results:'លទ្ធផលអីវ៉ាន់ / Warranty', sold:'លក់', no_matching_item:'រកមិនឃើញអីវ៉ាន់ដែលត្រូវគ្នា។',
+    stock_report_hint:'បញ្ជីរាប់ Stock ដែលអាចស្វែងរក Print និងជ្រើស column សម្រាប់ CSV/Excel។', reports_hint:'របាយការណ៍ Sales, Repair និងការរាប់ Stock ជាក់ស្តែង។',
+    product_models:'ចំនួន Model', system_stock:'Stock ក្នុងប្រព័ន្ធ', physical_stock_reconciliation:'ផ្ទៀងផ្ទាត់ Stock ជាក់ស្តែង',
+    physical_stock_hint:'ប្រើបញ្ជីនេះរាប់អីវ៉ាន់ពិត ហើយប្រៀបធៀប Actual Qty ជាមួយ System Qty។', print_count_sheet:'Print បញ្ជីរាប់', choose_columns:'ជ្រើស column សម្រាប់ Export/Print',
+    count_sheet_footer:'អាច Print បញ្ជីសម្រាប់រាប់អីវ៉ាន់ ឬ Export column ដែលបានជ្រើសទៅ CSV/Excel។'
+  }
+};
+function translator(lang) { const code = lang === 'km' ? 'km' : 'en'; return key => dictionaries[code][key] || dictionaries.en[key] || key; }
+module.exports = { translator };

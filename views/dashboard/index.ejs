@@ -1,0 +1,167 @@
+<div class="page-title-section" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;">
+  <div>
+    <h1 style="font-size:28px;font-weight:800;color:var(--text-primary);">Dashboard</h1>
+    <p style="color:var(--text-secondary);font-size:14px;">Welcome back, <%= user.name %>! Here's your store overview.</p>
+  </div>
+</div>
+
+<!-- STAT CARDS -->
+<div class="grid-4" style="margin-bottom:24px;">
+  <div class="stat-card primary">
+    <div class="stat-icon"><i class="bi bi-cash-stack"></i></div>
+    <div class="stat-label">Today Sales</div>
+    <div class="stat-value"><%= fmtUSD(todaySales.total_sales, 0) %></div>
+    <span class="stat-change positive"><i class="bi bi-arrow-up"></i> Good</span>
+  </div>
+  <div class="stat-card success">
+    <div class="stat-icon"><i class="bi bi-calendar-check"></i></div>
+    <div class="stat-label">Month Sales</div>
+    <div class="stat-value"><%= fmtUSD(monthSales.total_sales, 0) %></div>
+    <span class="stat-change positive"><i class="bi bi-arrow-up"></i> Growing</span>
+  </div>
+  <div class="stat-card info">
+    <div class="stat-icon"><i class="bi bi-box-seam"></i></div>
+    <div class="stat-label">Total Products</div>
+    <div class="stat-value"><%= totalProducts.count %></div>
+    <span class="stat-change positive"><i class="bi bi-check"></i> Active</span>
+  </div>
+  <div class="stat-card warning">
+    <div class="stat-icon"><i class="bi bi-exclamation-triangle"></i></div>
+    <div class="stat-label">Low Stock</div>
+    <div class="stat-value"><%= lowStock.count %></div>
+    <span class="stat-change negative"><i class="bi bi-arrow-down"></i> Alert</span>
+  </div>
+</div>
+
+<!-- CHARTS ROW -->
+<div class="grid-2" style="margin-bottom:24px;">
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h4><i class="bi bi-bar-chart-line"></i> Monthly Sales</h4>
+    </div>
+    <canvas id="salesChart"></canvas>
+  </div>
+  <div class="chart-container">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+      <h4><i class="bi bi-pie-chart"></i> Sales by Payment</h4>
+    </div>
+    <canvas id="paymentChart"></canvas>
+  </div>
+</div>
+
+<!-- RECENT ACTIVITY -->
+<div class="card">
+  <div class="card-header">
+    <h4><i class="bi bi-clock-history"></i> Recent Activity</h4>
+    <a href="/reports" class="btn btn-sm btn-outline">View All</a>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr><th>Type</th><th>Details</th><th>Amount</th><th>Date</th></tr>
+        </thead>
+        <tbody>
+          <% recentSales.forEach(function(s) { %>
+          <tr>
+            <td><span class="badge-custom success">Sale</span></td>
+            <td><%= s.sale_code %> - <%= s.customer_name || 'USER' %></td>
+            <td><strong><%= money(s.total) %></strong></td>
+            <td style="color:var(--text-light);font-size:13px;"><%= moment(s.created_at).format('MMM DD, YYYY') %></td>
+          </tr>
+          <% }); %>
+          <% pendingRepairsList.forEach(function(r) { %>
+          <tr>
+            <td><span class="badge-custom warning">Repair</span></td>
+            <td><%= r.ticket_code %> - <%= r.customer_name || 'N/A' %></td>
+            <td><strong><%= money(r.estimated_cost) %></strong></td>
+            <td style="color:var(--text-light);font-size:13px;"><%= moment(r.created_at).format('MMM DD, YYYY') %></td>
+          </tr>
+          <% }); %>
+          <% if (recentSales.length === 0 && pendingRepairsList.length === 0) { %>
+          <tr>
+            <td colspan="4" style="text-align:center;padding:40px;color:var(--text-light);">No recent activity</td>
+          </tr>
+          <% } %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- PENDING REPAIRS -->
+<% if (pendingRepairsList.length > 0) { %>
+<div class="card" style="margin-top:24px;">
+  <div class="card-header">
+    <h4><i class="bi bi-wrench"></i> Pending Repairs (<%= pendingRepairs.count %>)</h4>
+    <a href="/repairs" class="btn btn-sm btn-primary">View All</a>
+  </div>
+  <div class="card-body" style="padding:0;">
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr><th>Ticket</th><th>Customer</th><th>Device</th><th>Status</th></tr>
+        </thead>
+        <tbody>
+          <% pendingRepairsList.forEach(function(r) { %>
+          <tr>
+            <td><strong><%= r.ticket_code %></strong></td>
+            <td><%= r.customer_name || 'N/A' %></td>
+            <td><%= r.device_type %>: <%= r.device_model || '-' %></td>
+            <td><span class="badge-custom warning"><%= r.status %></span></td>
+          </tr>
+          <% }); %>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+<% } %>
+
+<script>
+// Monthly Sales Chart
+var ctx1 = document.getElementById('salesChart').getContext('2d');
+new Chart(ctx1, {
+  type: 'line',
+  data: {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+    datasets: [{
+      label: 'Sales',
+      data: [12500, 19000, 15000, 22000, 18000, 28000, 24000],
+      borderColor: '#6366f1',
+      backgroundColor: 'rgba(99,102,241,0.1)',
+      fill: true,
+      tension: 0.4,
+      pointBackgroundColor: '#6366f1',
+      pointRadius: 4
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { display: false } },
+    scales: {
+      y: { beginAtZero: true, grid: { color: 'rgba(0,0,0,0.05)' } },
+      x: { grid: { display: false } }
+    }
+  }
+});
+
+// Payment Chart
+var ctx2 = document.getElementById('paymentChart').getContext('2d');
+new Chart(ctx2, {
+  type: 'doughnut',
+  data: {
+    labels: ['Cash', 'Card', 'Mobile', 'Credit'],
+    datasets: [{
+      data: [45, 25, 20, 10],
+      backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ef4444'],
+      borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true,
+    plugins: { legend: { position: 'bottom', labels: { padding: 20, usePointStyle: true } } },
+    cutout: '70%'
+  }
+});
+</script>

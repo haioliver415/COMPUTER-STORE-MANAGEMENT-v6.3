@@ -1,0 +1,125 @@
+<div class="d-flex justify-content-between align-items-center mt-3 mb-3">
+  <div><h2 class="mb-1"><i class="bi bi-cart"></i> POS Sale</h2><div class="text-muted small"><%= t('pos_hint') %></div></div>
+  <% if (['admin','manager'].includes(user.role)) { %><a href="/after-sales" class="btn btn-outline-primary"><i class="bi bi-shield-check"></i> Warranty / After-Sales</a><% } %>
+</div>
+
+<div class="row g-3 pos-layout">
+  <div class="col-xl-8">
+    <div class="card h-100"><div class="card-body">
+      <div class="input-group mb-3">
+        <select id="categoryFilter" class="form-select" style="max-width:190px" onchange="searchProducts()">
+          <option value=""><%= t('all_categories') %></option>
+          <% categories.forEach(function(c) { %><option value="<%= c.id %>"><%= c.name %></option><% }); %>
+        </select>
+        <input type="text" id="searchProduct" class="form-control" placeholder="<%= t('search_product_placeholder') %>" onkeyup="debounceSearch()">
+        <button class="btn btn-outline-secondary" onclick="searchProducts()"><i class="bi bi-search"></i></button>
+      </div>
+      <div id="productList" class="row g-3 pos-product-grid"></div>
+    </div></div>
+  </div>
+
+  <div class="col-xl-4">
+    <div class="card mb-3">
+      <div class="card-header"><h5 class="mb-0"><i class="bi bi-cart3"></i> <%= t('cart') %></h5><span class="badge bg-primary" id="cartCount">0</span></div>
+      <div class="card-body"><div id="cartItems" class="pos-cart-list mb-3"></div><div class="d-flex justify-content-between border-top pt-3"><span class="fw-semibold"><%= t('total') %></span><strong class="fs-5" id="cartTotal">$0.00</strong></div></div>
+    </div>
+    <div class="card"><div class="card-header"><h5 class="mb-0"><i class="bi bi-cash-coin"></i> <%= t('checkout') %></h5></div><div class="card-body">
+      <div class="mb-3"><label class="form-label"><%= t('customer') %></label><select id="customerSelect" class="form-select customer-search-select" data-placeholder="Search customer name / phone" data-empty-label="USER"><option value="">USER</option><% customers.forEach(function(c) { %><option value="<%= c.id %>" data-name="<%= c.name %>" data-phone="<%= c.phone||'' %>" data-email="<%= c.email||'' %>"><%= c.name %><%= c.phone ? ' · '+c.phone : '' %></option><% }); %></select><div class="form-text">Click the field to search by customer name or phone, or choose <strong>USER</strong>.</div></div>
+      <div class="mb-3"><label class="form-label"><%= t('payment_method') %></label><select id="paymentMethod" class="form-select"><option value="cash">Cash</option><option value="card">Card</option><option value="mobile">Mobile</option><option value="credit">Credit (Due)</option></select></div>
+      <div class="pos-total-box mb-3">
+        <div class="d-flex justify-content-between"><span><%= t('exchange_rate') %></span><strong>$1 = <%= Number(settings.exchange_rate).toLocaleString('en-US') %> <%= settings.second_currency_code || 'KHR' %></strong></div>
+        <div class="d-flex justify-content-between mt-2"><span><%= t('total_usd') %></span><strong id="totalUSD">$0.00</strong></div>
+        <div class="d-flex justify-content-between mt-1"><span><%= t('total_riel') %></span><strong id="checkoutRiel"><%= settings.second_currency_symbol || '៛' %>0</strong></div>
+      </div>
+      <button class="btn btn-success btn-lg w-100" onclick="showPaymentModal()"><i class="bi bi-check-circle"></i> <%= t('complete_sale') %></button>
+    </div></div>
+  </div>
+</div>
+
+<div class="modal fade" id="unitPickerModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered modal-lg"><div class="modal-content">
+  <div class="modal-header"><div><h5 class="mb-0"><i class="bi bi-upc-scan"></i> Select Serial / Unit</h5><small class="text-muted" id="unitPickerTitle"></small></div><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body"><div class="alert alert-light border small py-2">This product is configured as <strong>Serial Required</strong>. Choose the exact physical unit being sold.</div><div class="input-group mb-3"><span class="input-group-text"><i class="bi bi-search"></i></span><input id="unitPickerSearch" class="form-control" placeholder="Search Serial or Unit Code" oninput="filterUnitPicker()"></div><div id="unitPickerBody" class="list-group"></div></div>
+</div></div></div>
+
+<div class="modal fade" id="paymentModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content">
+  <div class="modal-header"><h5><i class="bi bi-receipt"></i> <%= t('payment_confirmation') %></h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+  <div class="modal-body">
+    <div class="mb-3"><label class="form-label"><%= t('total_amount') %></label><div class="fw-bold fs-3" id="paymentTotal">$0.00</div><small class="text-muted" id="paymentRiel"></small></div>
+    <div class="mb-3"><label class="form-label">QE / Payment reference <small class="text-muted">(<%= t('optional') %>)</small></label><input id="qeCode" class="form-control"></div>
+    <div class="mb-3"><label class="form-label"><%= t('payment_method') %></label><select id="paymentMethodModal" class="form-select"><option value="cash">Cash</option><option value="card">Card</option><option value="mobile">Mobile</option><option value="credit">Credit (Due)</option></select></div>
+    <div class="small text-muted"><i class="bi bi-printer"></i> <%= t('print_pdf_hint') %></div>
+  </div>
+  <div class="modal-footer"><button class="btn btn-light" data-bs-dismiss="modal"><%= t('cancel') %></button><button class="btn btn-primary" id="completeSaleBtn" onclick="finalizeSale()"><i class="bi bi-printer"></i> <%= t('complete_print') %></button></div>
+</div></div></div>
+
+<script>
+var cart=[];
+var products=<%- JSON.stringify(products).replace(/</g,'\\u003c') %>;
+var RIEL_SYM='<%= settings.second_currency_symbol || '៛' %>';
+var EXCHANGE_RATE=Number(<%= settings.exchange_rate || 4100 %>)||4100;
+var searchTimer=null;
+function moneyFmt(n){return '$'+(Number(n)||0).toFixed(2)}
+function escapeHtml(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#039;')}
+function debounceSearch(){clearTimeout(searchTimer);searchTimer=setTimeout(searchProducts,220)}
+function productImage(p){return p.image?'/images/products/'+encodeURIComponent(p.image):''}
+function renderProducts(list){
+  var el=document.getElementById('productList');
+  if(!list.length){el.innerHTML='<div class="col-12"><div class="alert alert-info"><%= t('no_products') %></div></div>';return}
+  el.innerHTML=list.map(function(p){
+    var out=Number(p.stock_qty)<=0,img=productImage(p);
+    var photo=img?'<img src="'+img+'" class="pos-product-image" alt="">':'<div class="pos-product-image pos-product-placeholder"><i class="bi bi-image"></i></div>';
+    return '<div class="col-sm-6 col-lg-4"><div class="card pos-product-card h-100 '+(out?'pos-product-disabled':'pos-product-clickable')+'" data-product-id="'+p.id+'">'+photo+'<div class="card-body d-flex flex-column">'+
+      '<div class="small text-muted mb-1">'+escapeHtml(p.product_code||'')+(p.model?' · '+escapeHtml(p.model):'')+'</div><h6 class="mb-1">'+escapeHtml(p.name)+'</h6>'+
+      ((p.tracking_mode||'optional')==='required'?'<div class="small text-primary mb-2"><i class="bi bi-upc-scan"></i> Select serial at sale</div>':'<div class="mb-2"></div>')+
+      '<div class="d-flex justify-content-between align-items-end mt-auto"><div><div class="fw-bold">'+moneyFmt(p.sell_price)+'</div><div class="small '+(out?'text-danger':'text-muted')+'"><%= t('stock') %>: <strong>'+Number(p.stock_qty)+'</strong></div></div>'+
+      '<div class="pos-click-hint text-end">'+(out?'<span class="text-danger"><i class="bi bi-x-circle"></i> <%= t('out_stock') %></span>':'<i class="bi bi-hand-index-thumb"></i> Click product to add')+'</div></div></div></div></div>'
+  }).join('')
+}
+function mergeProducts(list){(list||[]).forEach(function(p){var i=products.findIndex(function(x){return Number(x.id)===Number(p.id)});if(i>=0)products[i]=Object.assign({},products[i],p);else products.push(p)})}
+function searchProducts(){var raw=document.getElementById('searchProduct').value.trim(),q=raw.toLowerCase(),cat=document.getElementById('categoryFilter').value;if(!raw){return renderProducts(products.filter(function(p){return !cat||String(p.category_id)===cat}))}var url='/pos/search?q='+encodeURIComponent(raw)+(cat?'&category_id='+encodeURIComponent(cat):'');fetch(url).then(function(r){return r.json()}).then(function(rows){if(!Array.isArray(rows))throw new Error(rows.error||'Search failed');mergeProducts(rows);renderProducts(rows)}).catch(function(){renderProducts(products.filter(function(p){return(String(p.product_code||'').toLowerCase().includes(q)||String(p.name||'').toLowerCase().includes(q)||String(p.model||'').toLowerCase().includes(q))&&(!cat||String(p.category_id)===cat)}))})}
+function addToCart(productId){
+  var p=products.find(function(x){return Number(x.id)===Number(productId)});
+  if(!p||Number(p.stock_qty)<=0)return showToast('<%= t('out_stock') %>','warning');
+  var item=cart.find(function(c){return c.product_id===Number(productId)});
+  if(item&&item.quantity>=Number(p.stock_qty))return showToast('<%= t('not_enough_stock') %>','warning');
+  if((p.tracking_mode||'optional')==='required')return openUnitPicker(p);
+  if(item)item.quantity++;else cart.push({product_id:Number(p.id),name:p.name,code:p.product_code||'',model:p.model||'',image:p.image||'',unit_price:Number(p.sell_price),quantity:1,tracking_mode:p.tracking_mode||'optional',unit_ids:[],selected_units:[]});
+  renderCart();
+}
+document.getElementById('productList').addEventListener('click',function(e){var card=e.target.closest('.pos-product-card[data-product-id]');if(card&&!card.classList.contains('pos-product-disabled'))addToCart(Number(card.dataset.productId))});
+function openUnitPicker(p){
+  var item=cart.find(function(c){return c.product_id===Number(p.id)}),used=(item&&item.unit_ids)||[];
+  document.getElementById('unitPickerTitle').textContent=p.name+' · '+(p.product_code||'');
+  document.getElementById('unitPickerSearch').value='';
+  document.getElementById('unitPickerBody').innerHTML='<div class="text-center text-muted py-4">Loading available units...</div>';
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('unitPickerModal')).show();
+  fetch('/pos/units/'+p.id).then(function(r){return r.json()}).then(function(d){if(!d.success)throw new Error(d.error||'Load failed');var available=d.units.filter(function(u){return !used.includes(Number(u.id))});var body=document.getElementById('unitPickerBody');if(!available.length){body.innerHTML='<div class="text-center text-muted py-4">No more available Serial / Units.</div>';return}body.innerHTML=available.map(function(u){var label=u.serial_number||u.internal_code;return '<button type="button" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center unit-pick" data-search="'+escapeHtml(((u.serial_number||'')+' '+u.internal_code).toLowerCase())+'" data-id="'+u.id+'" data-serial="'+escapeHtml(u.serial_number||'')+'" data-code="'+escapeHtml(u.internal_code)+'"><div><strong>'+escapeHtml(label)+'</strong><div class="small text-muted">Unit Code: '+escapeHtml(u.internal_code)+(u.serial_number?' · Serial: '+escapeHtml(u.serial_number):'')+'</div></div><span class="badge bg-light text-dark border">'+escapeHtml(u.source_type||'')+'</span></button>'}).join('');body.querySelectorAll('.unit-pick').forEach(function(btn){btn.addEventListener('click',function(){selectRequiredUnit(p,btn)})})}).catch(function(err){document.getElementById('unitPickerBody').innerHTML='<div class="alert alert-danger mb-0">'+escapeHtml(err.message)+'</div>'})
+}
+function filterUnitPicker(){var q=document.getElementById('unitPickerSearch').value.trim().toLowerCase();document.querySelectorAll('#unitPickerBody .unit-pick').forEach(function(btn){btn.classList.toggle('d-none',q&&!String(btn.dataset.search||'').includes(q))})}
+function selectRequiredUnit(p,btn){
+  var unit={id:Number(btn.dataset.id),serial_number:btn.dataset.serial||'',internal_code:btn.dataset.code||''},item=cart.find(function(c){return c.product_id===Number(p.id)});
+  if(!item){item={product_id:Number(p.id),name:p.name,code:p.product_code||'',model:p.model||'',image:p.image||'',unit_price:Number(p.sell_price),quantity:0,tracking_mode:'required',unit_ids:[],selected_units:[]};cart.push(item)}
+  if(item.unit_ids.includes(unit.id))return;
+  item.unit_ids.push(unit.id);item.selected_units.push(unit);item.quantity=item.unit_ids.length;
+  bootstrap.Modal.getOrCreateInstance(document.getElementById('unitPickerModal')).hide();renderCart();
+}
+function removeFromCart(i){cart.splice(i,1);renderCart()}
+function removeSelectedUnit(i,uIndex){var c=cart[i];if(!c||c.tracking_mode!=='required')return;c.unit_ids.splice(uIndex,1);c.selected_units.splice(uIndex,1);c.quantity=c.unit_ids.length;if(c.quantity<=0)cart.splice(i,1);renderCart()}
+function changeQty(i,v){var c=cart[i];if(c.tracking_mode==='required')return renderCart();var qty=Math.max(1,parseInt(v,10)||1),p=products.find(function(x){return Number(x.id)===c.product_id});c.quantity=Math.min(qty,Number(p.stock_qty));renderCart()}
+function renderCart(){
+  var el=document.getElementById('cartItems');
+  if(!cart.length)el.innerHTML='<div class="text-muted text-center py-4"><i class="bi bi-cart3 fs-2 d-block mb-2"></i><%= t('cart_empty') %></div>';else el.innerHTML=cart.map(function(c,i){var sub=c.unit_price*c.quantity,img=c.image?'/images/products/'+encodeURIComponent(c.image):'';var photo=img?'<img src="'+img+'" class="pos-cart-thumb" alt="">':'<div class="pos-cart-thumb pos-product-placeholder"><i class="bi bi-image"></i></div>';var unitHtml='';if(c.tracking_mode==='required'){unitHtml='<div class="mt-2 d-flex flex-wrap gap-1">'+(c.selected_units||[]).map(function(u,ui){return '<span class="badge bg-light text-dark border">'+escapeHtml(u.serial_number||u.internal_code)+' <button type="button" class="btn-close ms-1" style="font-size:7px" onclick="removeSelectedUnit('+i+','+ui+')"></button></span>'}).join('')+'</div><button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addToCart('+c.product_id+')"><i class="bi bi-plus"></i> Add another serial</button>'}var qtyControl=c.tracking_mode==='required'?'<span class="badge bg-primary">Qty '+c.quantity+'</span>':'<input type="number" min="1" class="form-control form-control-sm pos-qty" value="'+c.quantity+'" onchange="changeQty('+i+',this.value)">';return '<div class="pos-cart-item">'+photo+'<div class="flex-grow-1 min-w-0"><div class="d-flex justify-content-between gap-2"><div><strong class="small d-block text-truncate">'+escapeHtml(c.name)+'</strong><span class="small text-muted">'+escapeHtml(c.code)+(c.model?' · '+escapeHtml(c.model):'')+'</span></div><button class="btn btn-sm btn-link text-danger p-0" onclick="removeFromCart('+i+')"><i class="bi bi-x-lg"></i></button></div>'+unitHtml+'<div class="d-flex align-items-center justify-content-between mt-2">'+qtyControl+'<strong class="small">'+moneyFmt(sub)+'</strong></div></div></div>'}).join('');
+  var total=cart.reduce(function(s,c){return s+c.unit_price*c.quantity},0),count=cart.reduce(function(s,c){return s+c.quantity},0);
+  document.getElementById('cartCount').textContent=count;document.getElementById('cartTotal').textContent=moneyFmt(total);document.getElementById('totalUSD').textContent=moneyFmt(total);document.getElementById('checkoutRiel').textContent=RIEL_SYM+Math.round(total*EXCHANGE_RATE).toLocaleString('en-US')
+}
+function showPaymentModal(){if(!cart.length)return showToast('<%= t('add_items_first') %>','warning');var total=cart.reduce(function(s,c){return s+c.unit_price*c.quantity},0);document.getElementById('paymentTotal').textContent=moneyFmt(total);document.getElementById('paymentRiel').textContent=RIEL_SYM+Math.round(total*EXCHANGE_RATE).toLocaleString('en-US');document.getElementById('paymentMethodModal').value=document.getElementById('paymentMethod').value;bootstrap.Modal.getOrCreateInstance(document.getElementById('paymentModal')).show()}
+function finalizeSale(){
+  var btn=document.getElementById('completeSaleBtn');btn.disabled=true;
+  var total=cart.reduce(function(s,c){return s+c.unit_price*c.quantity},0),qe=document.getElementById('qeCode').value.trim(),pm=document.getElementById('paymentMethodModal').value,customerId=document.getElementById('customerSelect').value||null;
+  if(pm==='credit'&&!customerId){btn.disabled=false;return showToast('<%= t('select_credit_customer') %>','warning')}
+  var saleItems=cart.map(function(c){return {product_id:c.product_id,quantity:c.quantity,unit_ids:c.unit_ids||[]}});
+  fetch('/pos/sale',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({items:saleItems,customer_id:customerId,discount:0,discount_type:'fixed',tax:0,payment_method:pm,paid_amount:pm==='credit'?0:total,notes:qe?'QE Code: '+qe:''})})
+    .then(function(r){return r.json()}).then(function(data){if(!data.success)throw new Error(data.error||'Sale failed');window.location.href='/pos/receipt/'+data.sale_id+'?print=1'}).catch(function(e){showToast(e.message,'danger');btn.disabled=false})
+}
+renderProducts(products);renderCart();
+</script>
